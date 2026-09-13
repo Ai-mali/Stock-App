@@ -512,6 +512,23 @@ def main(page: ft.Page):
             log(f"CSV export failed: {ex}")
 
     # ------------------------------------------------------------- scan
+    def set_busy(busy: bool):
+        """Give the buttons a live/loading feel while a scan runs."""
+        scan_btn.disabled = busy
+        load_btn.disabled = busy
+        clear_btn.disabled = busy
+        if busy:
+            scan_btn.content = ft.Row(
+                [ft.ProgressRing(width=16, height=16, stroke_width=2,
+                                 color="white"),
+                 ft.Text("SCANNING...", size=14, weight=ft.FontWeight.W_600)],
+                spacing=8, alignment=ft.MainAxisAlignment.CENTER, tight=True)
+            scan_btn.icon = None
+        else:
+            scan_btn.content = ft.Text("SCAN", size=14, weight=ft.FontWeight.W_600)
+            scan_btn.icon = ft.Icons.QR_CODE_SCANNER
+        page.update()
+
     def do_scan(e):
         if not state["image_path"]:
             log("Load an image before scanning.")
@@ -526,6 +543,7 @@ def main(page: ft.Page):
         from google import genai
         from google.genai import types
 
+        set_busy(True)
         log("Gemini multimodal parser active: scanning tabular data...")
         page.update()
         try:
@@ -571,13 +589,16 @@ def main(page: ft.Page):
                 raise last_err
         except Exception as ex:
             log(f"Gemini request failed: {ex}")
+            set_busy(False)
             return
         try:
             rows = parse_gemini_json(resp.text or "")
         except Exception as ex:
             log(f"Could not parse Gemini response ({ex}). Raw reply logged below.")
             log((resp.text or "")[:300])
+            set_busy(False)
             return
+        set_busy(False)
         n_serial = set_results(rows)
         if rows:
             log(f"Extract complete. {len(rows)} models and {n_serial} serial numbers found.", ok=True)
@@ -670,6 +691,26 @@ def main(page: ft.Page):
         margin=ft.Margin(-20, -20, -20, 14),
     )
 
+    load_btn = ft.OutlinedButton(
+        "Load Image", icon=ft.Icons.UPLOAD_FILE_OUTLINED,
+        on_click=load_image, expand=True,
+        style=ft.ButtonStyle(padding=ft.Padding(8, 10, 8, 10)),
+    )
+    scan_btn = ft.Button(
+        "SCAN", icon=ft.Icons.QR_CODE_SCANNER,
+        bgcolor=TEAL, color="white", elevation=0, expand=True,
+        style=ft.ButtonStyle(
+            padding=ft.Padding(8, 10, 8, 10),
+            text_style=ft.TextStyle(size=14, weight=ft.FontWeight.W_600),
+        ),
+        on_click=do_scan,
+    )
+    clear_btn = ft.OutlinedButton(
+        "Clear", icon=ft.Icons.DELETE_OUTLINE,
+        on_click=do_clear, expand=True,
+        style=ft.ButtonStyle(padding=ft.Padding(8, 10, 8, 10)),
+    )
+
     left_card = card(
         ft.Column(
             [
@@ -677,29 +718,9 @@ def main(page: ft.Page):
                 img_frame,
                 ft.Row(
                     [
-                        ft.OutlinedButton(
-                            "Load Image",
-                            icon=ft.Icons.UPLOAD_FILE_OUTLINED,
-                            on_click=load_image,
-                            expand=True,
-                            style=ft.ButtonStyle(padding=ft.Padding(8, 10, 8, 10)),
-                        ),
-                        ft.Button(
-                            "SCAN", icon=ft.Icons.QR_CODE_SCANNER,
-                            bgcolor=TEAL, color="white", elevation=0,
-                            expand=True,
-                            style=ft.ButtonStyle(
-                                padding=ft.Padding(8, 10, 8, 10),
-                                text_style=ft.TextStyle(size=14, weight=ft.FontWeight.W_600),
-                            ),
-                            on_click=do_scan,
-                        ),
-                        ft.OutlinedButton(
-                            "Clear", icon=ft.Icons.DELETE_OUTLINE,
-                            on_click=do_clear,
-                            expand=True,
-                            style=ft.ButtonStyle(padding=ft.Padding(8, 10, 8, 10)),
-                        ),
+                        load_btn,
+                        scan_btn,
+                        clear_btn,
                     ],
                     spacing=8,
                 ),
