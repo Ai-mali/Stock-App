@@ -7,6 +7,7 @@ Run:  python extractor_app.py
 Build: pyinstaller --noconsole --onefile --name ModelSerialExtractor extractor_app.py
 """
 
+import asyncio
 import csv
 import datetime
 import json
@@ -16,7 +17,9 @@ from pathlib import Path
 
 import flet as ft
 
-GEMINI_MODEL = "gemini-3.5-flash"
+# "gemini-flash-latest" tracks the newest flash model — avoids model retirement
+# (gemini-1.5/2.5/3.5 flash get deprecated for new keys over time).
+GEMINI_MODEL = "gemini-flash-latest"
 CONFIG_PATH = Path.home() / ".model_serial_extractor.json"
 
 PROMPT = """Extract model number and serial number from this Daikin equipment parts list.
@@ -91,16 +94,22 @@ def parse_gemini_json(raw: str) -> list[dict]:
     return rows
 
 
-def load_saved_key() -> str:
+def load_saved_keys() -> list[str]:
+    """Return the saved API-key list; migrates the old single-key format."""
     try:
-        return json.loads(CONFIG_PATH.read_text()).get("api_key", "")
+        data = json.loads(CONFIG_PATH.read_text())
     except Exception:
-        return ""
+        return []
+    keys = data.get("api_keys")
+    if isinstance(keys, list):
+        return [k for k in keys if k]
+    old = data.get("api_key", "")
+    return [old] if old else []
 
 
-def save_key(key: str) -> None:
+def save_keys(keys: list[str]) -> None:
     try:
-        CONFIG_PATH.write_text(json.dumps({"api_key": key}))
+        CONFIG_PATH.write_text(json.dumps({"api_keys": keys}))
     except Exception:
         pass
 
@@ -122,14 +131,14 @@ def main(page: ft.Page):
     page.padding = 20
     page.theme = ft.Theme(font_family="Segoe UI")
     if page.window:
-        page.window.width = 1180
-        page.window.height = 780
-        page.window.min_width = 900
-        page.window.min_height = 600
+        page.window.width = 1040
+        page.window.height = 720
+        page.window.min_width = 720
+        page.window.min_height = 560
 
     # ------------------------------------------------------------- state
     state = {
-        "api_key": load_saved_key(),
+        "api_keys": load_saved_keys(),
         "engine": None,          # None | 'gemini' | 'model'
         "image_path": None,
         "rows": [],
@@ -159,36 +168,82 @@ def main(page: ft.Page):
         bgcolor="#FAFBFC",
         alignment=ft.Alignment(0, 0),
     )
-    zoom_img = ft.Image(src="", fit=ft.BoxFit.CONTAIN)
-    zoom_box = ft.Container(zoom_img)
-    zoom_dialog = ft.AlertDialog(
-        modal=True,
+    # ---- Telegram-style zoom overlay: drag to pan, double-click or
+    # +/- buttons to zoom, X or background click to close.
+    zoom_state = {"scale": 1.0, "dx": 0.0, "dy": 0.0}
+    zoom_img = ft.Image(src="", fit=ft.BoxFit.CONTAIN, expand=True)
+
+    def _apply_zoom():
+        zoom_img.scale = ft.Scale(zoom_state["scale"])
+        zoom_img.offset = ft.Offset(zoom_state["dx"], zoom_state["dy"])
+        page.update()
+
+    def _pan(e):
+        zoom_state["dx"] += e.delta_x
+        zoom_state["dy"] += e.delta_y
+        _apply_zoom()
+
+    def _zoom_by(factor):
+        zoom_state["scale"] = min(6.0, max(0.5, zoom_state["scale"] * factor))
+        _apply_zoom()
+
+    def _dbl(e):
+        # double-click toggles between fit and 2x zoom
+        if zoom_state["scale"] > 1.01:
+            zoom_state.update(scale=1.0, dx=0.0, dy=0.0)
+        else:
+            zoom_state["scale"] = 2.0
+        _apply_zoom()
+
+    def close_zoom(e=None):
+        zoom_overlay.visible = False
+        page.update()
+
+    zoom_overlay = ft.Container(
+        visible=False,
+        expand=True,
+        bgcolor="#000000CC",
         content=ft.Stack([
-            zoom_box,
+            ft.GestureDetector(
+                content=ft.Container(zoom_img, expand=True,
+                                     alignment=ft.Alignment(0, 0),
+                                     clip_behavior=ft.ClipBehavior.HARD_EDGE),
+                on_pan_update=_pan,
+                on_double_tap=_dbl,
+            ),
             ft.Container(
-                ft.IconButton(ft.Icons.CLOSE, icon_size=18, icon_color=INK,
-                              bgcolor="#FFFFFFDD",
-                              on_click=lambda e: close_zoom()),
-                right=8, top=8,
+                ft.IconButton(ft.Icons.CLOSE, icon_size=20, icon_color="white",
+                              bgcolor="#00000066", on_click=close_zoom,
+                              tooltip="Close"),
+                right=12, top=12,
+            ),
+            ft.Container(
+                ft.Row([
+                    ft.IconButton(ft.Icons.REMOVE, icon_color="white",
+                                  bgcolor="#00000066",
+                                  on_click=lambda e: _zoom_by(0.75)),
+                    ft.IconButton(ft.Icons.ADD, icon_color="white",
+                                  bgcolor="#00000066",
+                                  on_click=lambda e: _zoom_by(1.33)),
+                    ft.IconButton(ft.Icons.FIT_SCREEN, icon_color="white",
+                                  bgcolor="#00000066", tooltip="Fit",
+                                  on_click=lambda e: (
+                                      zoom_state.update(scale=1.0, dx=0.0, dy=0.0),
+                                      _apply_zoom())),
+                ], spacing=4),
+                bottom=16, alignment=ft.Alignment(0, 1),
             ),
         ]),
-        content_padding=0,
     )
-
-    def close_zoom():
-        zoom_dialog.open = False
-        page.update()
 
     def open_zoom(e):
         if not state["image_path"]:
             return
-        # Fit the zoom view to ~85% of the current window so it works on
-        # any screen size the app is shipped to.
-        zoom_box.width = max(400, (page.width or 1000) * 0.85)
-        zoom_box.height = max(300, (page.height or 700) * 0.75)
+        zoom_state.update(scale=1.0, dx=0.0, dy=0.0)
         zoom_img.src = state["image_path"]
-        zoom_dialog.open = True
-        page.show_dialog(zoom_dialog)
+        zoom_img.scale = ft.Scale(1.0)
+        zoom_img.offset = ft.Offset(0, 0)
+        zoom_overlay.visible = True
         page.update()
 
     img_frame = ft.Container(
@@ -275,8 +330,10 @@ def main(page: ft.Page):
         for i, r in enumerate(rows):
             result_rows.append(ft.Container(
                 ft.Row([
-                    cell(r["no"], FLEX["no"], color=INK_SOFT),
-                    cell(r["model"], FLEX["model"]),
+                    cell(r["no"], FLEX["no"], color=INK_SOFT,
+                         no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
+                    cell(r["model"], FLEX["model"],
+                         no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
                     cell(r["serial"] or r["desc"], FLEX["serial"],
                          italic=not r["serial"],
                          color=INK if r["serial"] else INK_SOFT),
@@ -312,47 +369,89 @@ def main(page: ft.Page):
         model_btn.elevation = gemini_btn.elevation = 0
         page.update()
 
-    # ------------------------------------------------------------- API key dialog
+    # ------------------------------------------------------------- API key manager
+    # Multiple keys are supported: if one key hits a quota/error mid-scan the
+    # next key in the list takes over automatically.
     key_field = ft.TextField(password=True, can_reveal_password=True,
-                             label="Gemini API key", hint_text="Paste your API key",
+                             label="Gemini API key", hint_text="Paste a new API key",
                              dense=True)
-    remember_cb = ft.Checkbox(label="Remember on this PC", value=False)
+    keys_list = ft.Column(spacing=4)
+
+    def _mask(k: str) -> str:
+        return k[:6] + "..." + k[-4:] if len(k) > 12 else "****"
+
+    def refresh_keys_list():
+        keys_list.controls = [
+            ft.Row([
+                ft.Icon(ft.Icons.KEY, size=14, color=TEAL),
+                ft.Text(f"Key {i+1}: {_mask(k)}", size=12,
+                        font_family="Consolas", expand=True),
+                ft.IconButton(ft.Icons.CLOSE, icon_size=14, tooltip="Remove key",
+                              icon_color=INK_SOFT,
+                              on_click=lambda e, i=i: remove_key(i)),
+            ], spacing=6)
+            for i, k in enumerate(state["api_keys"])
+        ]
+        page.update()
+
+    def remove_key(i: int):
+        state["api_keys"].pop(i)
+        save_keys(state["api_keys"])
+        refresh_keys_list()
+        if not state["api_keys"]:
+            state["engine"] = None
+            style_engine_buttons()
+        log(f"Key {i+1} removed.")
+
+    def add_key(e=None):
+        k = key_field.value.strip()
+        if not k:
+            return
+        if k in state["api_keys"]:
+            log("That key is already saved.")
+        else:
+            state["api_keys"].append(k)
+            save_keys(state["api_keys"])
+            log(f"Key {len(state['api_keys'])} added ({_mask(k)}).", ok=True)
+        key_field.value = ""
+        refresh_keys_list()
+        state["engine"] = "gemini"
+        style_engine_buttons()
 
     def close_key_dialog(e=None):
         key_dialog.open = False
-        page.update()
-
-    def save_key_click(e):
-        state["api_key"] = key_field.value.strip()
-        if remember_cb.value and state["api_key"]:
-            save_key(state["api_key"])
-        key_dialog.open = False
-        if state["api_key"]:
+        if state["api_keys"]:
             state["engine"] = "gemini"
-            log("Gemini API key set. Engine: Gemini Flash ready.")
-        else:
-            state["engine"] = None
-            log("No API key entered — Gemini Flash disabled.")
-        style_engine_buttons()
+            style_engine_buttons()
+            log(f"Engine: Gemini Flash ready ({len(state['api_keys'])} key(s) saved).")
         page.update()
 
     key_dialog = ft.AlertDialog(
         modal=True,
-        title=ft.Text("Gemini API key", size=15, weight=ft.FontWeight.W_600),
-        content=ft.Column([key_field, remember_cb], tight=True, spacing=10),
+        title=ft.Text("Gemini API keys", size=15, weight=ft.FontWeight.W_600),
+        content=ft.Container(
+            ft.Column([
+                keys_list,
+                ft.Row([key_field,
+                        ft.IconButton(ft.Icons.ADD_CIRCLE_OUTLINE,
+                                      icon_color=TEAL, tooltip="Add key",
+                                      on_click=add_key)], spacing=6),
+                ft.Text("If one key hits its daily limit, the next key is "
+                        "used automatically.", size=11, color=INK_SOFT),
+            ], tight=True, spacing=10),
+            width=380,
+        ),
         actions=[
-            ft.TextButton("Cancel", on_click=close_key_dialog),
-            ft.FilledButton("Save", on_click=save_key_click),
+            ft.FilledButton("Done", on_click=close_key_dialog),
         ],
     )
 
     def pick_gemini(e):
-        if state["engine"] == "gemini" and state["api_key"]:
-            return
-        key_field.value = state["api_key"] or ""
+        # Always open the manager so more keys can be added later.
+        refresh_keys_list()
         key_dialog.open = True
         page.show_dialog(key_dialog)
-        if state["api_key"]:
+        if state["api_keys"]:
             state["engine"] = "gemini"
             style_engine_buttons()
         page.update()
@@ -417,8 +516,8 @@ def main(page: ft.Page):
         if not state["image_path"]:
             log("Load an image before scanning.")
             return
-        if state["engine"] != "gemini" or not state["api_key"]:
-            log("Choose the Gemini Flash engine and enter your API key first.")
+        if state["engine"] != "gemini" or not state["api_keys"]:
+            log("Choose the Gemini Flash engine and add an API key first.")
             pick_gemini(None)
             return
         page.run_task(run_gemini)
@@ -434,14 +533,42 @@ def main(page: ft.Page):
             suffix = Path(state["image_path"]).suffix.lower().lstrip(".")
             mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
                     "webp": "image/webp", "bmp": "image/bmp"}.get(suffix, "image/jpeg")
-            client = genai.Client(api_key=state["api_key"])
-            resp = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=[
-                    types.Part.from_bytes(data=img_bytes, mime_type=mime),
-                    PROMPT,
-                ],
-            )
+            contents = [types.Part.from_bytes(data=img_bytes, mime_type=mime),
+                        PROMPT]
+
+            def _retryable(err: Exception) -> bool:
+                s = str(err)
+                return any(t in s for t in
+                           ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED",
+                            "quota"))
+
+            # Try each saved key in turn; on a retryable error (busy / quota)
+            # wait briefly, then move on to the next key.
+            resp = None
+            last_err = None
+            for ki, key in enumerate(state["api_keys"]):
+                if len(state["api_keys"]) > 1:
+                    log(f"Using key {ki + 1} of {len(state['api_keys'])}...")
+                client = genai.Client(api_key=key)
+                for attempt in range(3):
+                    try:
+                        resp = client.models.generate_content(
+                            model=GEMINI_MODEL, contents=contents)
+                        break
+                    except Exception as ex:
+                        last_err = ex
+                        if not _retryable(ex):
+                            raise
+                        if attempt < 2:
+                            log(f"Gemini busy — retrying in "
+                                f"{2 * (attempt + 1)}s...")
+                            await asyncio.sleep(2 * (attempt + 1))
+                if resp is not None:
+                    break
+                if ki + 1 < len(state["api_keys"]):
+                    log(f"Key {ki + 1} exhausted — switching to key {ki + 2}.")
+            if resp is None:
+                raise last_err
         except Exception as ex:
             log(f"Gemini request failed: {ex}")
             return
@@ -554,25 +681,27 @@ def main(page: ft.Page):
                             "Load Image",
                             icon=ft.Icons.UPLOAD_FILE_OUTLINED,
                             on_click=load_image,
+                            expand=True,
+                            style=ft.ButtonStyle(padding=ft.Padding(8, 10, 8, 10)),
                         ),
-                        ft.Container(
-                            ft.Button(
-                                "SCAN", icon=ft.Icons.QR_CODE_SCANNER,
-                                bgcolor=TEAL, color="white", elevation=0,
-                                style=ft.ButtonStyle(
-                                    padding=ft.Padding(28, 14, 28, 14),
-                                    text_style=ft.TextStyle(size=14, weight=ft.FontWeight.W_600),
-                                ),
-                                on_click=do_scan,
+                        ft.Button(
+                            "SCAN", icon=ft.Icons.QR_CODE_SCANNER,
+                            bgcolor=TEAL, color="white", elevation=0,
+                            expand=True,
+                            style=ft.ButtonStyle(
+                                padding=ft.Padding(8, 10, 8, 10),
+                                text_style=ft.TextStyle(size=14, weight=ft.FontWeight.W_600),
                             ),
-                            alignment=ft.Alignment(0, 0),
+                            on_click=do_scan,
                         ),
                         ft.OutlinedButton(
                             "Clear", icon=ft.Icons.DELETE_OUTLINE,
                             on_click=do_clear,
+                            expand=True,
+                            style=ft.ButtonStyle(padding=ft.Padding(8, 10, 8, 10)),
                         ),
                     ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    spacing=8,
                 ),
             ],
             spacing=12,
@@ -622,35 +751,42 @@ def main(page: ft.Page):
     )
 
     page.add(
-        ft.Column(
+        ft.Stack(
             [
-                header,
-                ft.Row(
+                ft.Column(
                     [
-                        ft.Column(
-                            [left_card, log_card],
-                            expand=5, spacing=16,
-                            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        header,
+                        ft.Row(
+                            [
+                                ft.Column(
+                                    [left_card, log_card],
+                                    expand=5, spacing=16,
+                                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                                ),
+                                ft.Column([results_card], expand=6,
+                                          horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+                            ],
+                            vertical_alignment=ft.CrossAxisAlignment.START,
+                            spacing=16,
+                            expand=True,
                         ),
-                        ft.Column([results_card], expand=6,
-                                  horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                     ],
-                    vertical_alignment=ft.CrossAxisAlignment.START,
-                    spacing=16,
                     expand=True,
                 ),
+                zoom_overlay,
             ],
             expand=True,
         )
     )
 
     style_engine_buttons()
-    if state["api_key"]:
+    if state["api_keys"]:
         state["engine"] = "gemini"
         style_engine_buttons()
-        log("App initialized. Engine: Gemini Flash (saved key loaded).")
+        log(f"App initialized. Engine: Gemini Flash "
+            f"({len(state['api_keys'])} saved key(s)).")
     else:
-        log("App initialized. Select 'Gemini Flash' and enter your API key.")
+        log("App initialized. Select 'Gemini Flash' and add your API key.")
     log("Waiting for image payload...")
 
 
