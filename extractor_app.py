@@ -17,14 +17,37 @@ from pathlib import Path
 
 import flet as ft
 
-# "gemini-flash-latest" tracks the newest flash model — avoids model retirement
-# (gemini-1.5/2.5/3.5 flash get deprecated for new keys over time).
-GEMINI_MODEL = "gemini-flash-latest"
-# Alibaba Cloud Model Studio (DashScope) vision model, OpenAI-compatible API.
-ALIBABA_MODEL = "qwen-vl-max"
-ALIBABA_URL = ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/"
-               "chat/completions")
 CONFIG_PATH = Path.home() / ".model_serial_extractor.json"
+
+# Supported scan providers. Each holds its own key list and picked model.
+PROVIDERS = {
+    "gemini": {
+        "label": "Gemini",
+        "models": ["gemini-flash-latest", "gemini-2.5-flash",
+                   "gemini-2.0-flash", "gemini-3.5-flash"],
+        "default": "gemini-flash-latest",
+        "url": None,  # uses the google-genai SDK
+    },
+    "alibaba": {
+        "label": "Alibaba (Qwen-VL)",
+        "models": ["qwen-vl-max", "qwen-vl-plus"],
+        "default": "qwen-vl-max",
+        "url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/"
+               "chat/completions",
+    },
+    "openai": {
+        "label": "ChatGPT",
+        "models": ["gpt-4o-mini", "gpt-4o"],
+        "default": "gpt-4o-mini",
+        "url": "https://api.openai.com/v1/chat/completions",
+    },
+    "anthropic": {
+        "label": "Claude",
+        "models": ["claude-sonnet-4-5", "claude-haiku-4-5"],
+        "default": "claude-sonnet-4-5",
+        "url": "https://api.anthropic.com/v1/messages",
+    },
+}
 
 PROMPT = """Extract model number and serial number from this Daikin equipment parts list.
 No = the line item number in the leftmost No column.
@@ -98,34 +121,41 @@ def parse_gemini_json(raw: str) -> list[dict]:
     return rows
 
 
-def load_saved_keys() -> dict:
-    """Return saved API keys per engine; migrates the old single-key format."""
-    out = {"gemini": [], "alibaba": []}
+def load_providers() -> dict:
+    """Return {provider: {"keys": [...], "model": str}}; migrates old formats."""
+    out = {p: {"keys": [], "model": PROVIDERS[p]["default"]}
+           for p in PROVIDERS}
     try:
         data = json.loads(CONFIG_PATH.read_text())
     except Exception:
         return out
-    for eng in out:
-        keys = data.get(f"{eng}_keys")
-        if isinstance(keys, list):
-            out[eng] = [k for k in keys if k]
-    # migrate legacy fields (single key / flat list) into the gemini slot
-    legacy = data.get("api_keys")
-    if isinstance(legacy, list):
-        out["gemini"] += [k for k in legacy if k]
+    saved = data.get("providers")
+    if isinstance(saved, dict):
+        for p, cfg in saved.items():
+            if p in out and isinstance(cfg, dict):
+                if isinstance(cfg.get("keys"), list):
+                    out[p]["keys"] = [k for k in cfg["keys"] if k]
+                if cfg.get("model"):
+                    out[p]["model"] = cfg["model"]
+    # migrate legacy key fields into the gemini/alibaba slots
+    for eng in ("gemini", "alibaba"):
+        legacy = data.get(f"{eng}_keys")
+        if isinstance(legacy, list):
+            out[eng]["keys"] += [k for k in legacy if k]
+    flat = data.get("api_keys")
+    if isinstance(flat, list):
+        out["gemini"]["keys"] += [k for k in flat if k]
     old = data.get("api_key", "")
     if old:
-        out["gemini"].append(old)
-    for eng in out:
-        out[eng] = list(dict.fromkeys(out[eng]))
+        out["gemini"]["keys"].append(old)
+    for p in out:
+        out[p]["keys"] = list(dict.fromkeys(out[p]["keys"]))
     return out
 
 
-def save_keys(keys: dict) -> None:
+def save_providers(providers: dict) -> None:
     try:
-        CONFIG_PATH.write_text(json.dumps(
-            {"gemini_keys": keys.get("gemini", []),
-             "alibaba_keys": keys.get("alibaba", [])}))
+        CONFIG_PATH.write_text(json.dumps({"providers": providers}))
     except Exception:
         pass
 
@@ -154,9 +184,9 @@ def main(page: ft.Page):
 
     # ------------------------------------------------------------- state
     state = {
-        "api_keys": load_saved_keys(),  # {"gemini": [...], "alibaba": [...]}
-        "engine": None,          # None | 'gemini' | 'alibaba' | 'model'
-        "key_engine": "gemini",  # which engine the key dialog is editing
+        "providers": load_providers(),  # {name: {"keys": [...], "model": str}}
+        "engine": None,          # None | provider key
+        "key_engine": "gemini",  # provider currently shown in the manager
         "image_path": None,
         "rows": [],
     }
@@ -375,53 +405,61 @@ def main(page: ft.Page):
         page.update()
         return serial_count
 
-    # ------------------------------------------------------------- engine buttons
-    ENGINE_LABEL = {"gemini": "Gemini Flash", "alibaba": "Alibaba (Qwen-VL)"}
+    # ------------------------------------------------------------- Scan Model
+    # One button opens a manager window: provider list on top, each provider
+    # has its own model dropdown + multi-key list. The button label collapses
+    # to the chosen provider/model afterwards.
+    engine_btn = ft.Button("Scan Model", icon=ft.Icons.MEMORY,
+                           bgcolor=ENGINE_GRAY, color=INK, elevation=0)
 
-    def style_engine_buttons():
-        engine_btn.content = ft.Row(
-            [ft.Icon(ft.Icons.MEMORY, size=16, color=INK),
-             ft.Text(ENGINE_LABEL.get(state["engine"], "Scanner Model"),
-                     color=INK, size=13, weight=ft.FontWeight.W_500,
-                     no_wrap=True),
-             ft.Icon(ft.Icons.ARROW_DROP_DOWN, size=18, color=INK)],
-            spacing=6, tight=True,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER)
-        page.update()
+    def engine_caption() -> str:
+        eng = state["engine"]
+        if not eng:
+            return "Scan Model"
+        p = PROVIDERS[eng]
+        return f"Scan Model ({p['label']} · {state['providers'][eng]['model']})"
 
-    engine_btn = ft.PopupMenuButton(
-        content=ft.Row([ft.Text("Scanner Model")], tight=True),
-        bgcolor=ENGINE_GRAY,
-        style=ft.ButtonStyle(padding=ft.Padding(14, 8, 14, 8),
-                             elevation=0),
-        items=[
-            ft.PopupMenuItem(
-                content=ft.Text("Gemini Flash"),
-                on_click=lambda e: pick_engine("gemini")),
-            ft.PopupMenuItem(
-                content=ft.Text("Alibaba (Qwen-VL)"),
-                on_click=lambda e: pick_engine("alibaba")),
-        ],
-    )
-
-    # ------------------------------------------------------------- API key manager
-    # Multiple keys are supported: if one key hits a quota/error mid-scan the
-    # next key in the list takes over automatically.
+    # ------------------------------------------------------------- engine manager
+    # One window listing all providers; each has a model dropdown and its own
+    # multi-key list. Selecting a provider (with at least one key) sets it as
+    # the active engine and the header button collapses to show the choice.
     key_field = ft.TextField(password=True, can_reveal_password=True,
                              label="API key", hint_text="Paste a new API key",
                              dense=True)
     keys_list = ft.Column(spacing=4)
+    model_dd = ft.Dropdown(label="Model", dense=True, expand=True)
+    provider_row = ft.Row(spacing=6)
 
     def _mask(k: str) -> str:
         return k[:6] + "..." + k[-4:] if len(k) > 12 else "****"
 
-    def _keys() -> list:
-        return state["api_keys"][state["key_engine"]]
+    def _cfg() -> dict:
+        return state["providers"][state["key_engine"]]
 
-    def refresh_keys_list():
+    def refresh_engine_btn():
+        engine_btn.content = ft.Row(
+            [ft.Icon(ft.Icons.MEMORY, size=16, color=INK),
+             ft.Text(engine_caption(), color=INK, size=13,
+                     weight=ft.FontWeight.W_500, no_wrap=True)],
+            spacing=6, tight=True)
+        page.update()
+
+    def refresh_provider_panel():
         eng = state["key_engine"]
-        key_dialog.title.value = f"{ENGINE_LABEL[eng]} API keys"
-        key_field.label = f"{ENGINE_LABEL[eng]} API key"
+        provider_row.controls = [
+            ft.Button(
+                PROVIDERS[p]["label"], expand=True,
+                bgcolor=(TEAL if p == eng else ENGINE_GRAY),
+                color=("white" if p == eng else INK), elevation=0,
+                style=ft.ButtonStyle(padding=ft.Padding(4, 8, 4, 8),
+                                     text_style=ft.TextStyle(size=12)),
+                on_click=lambda e, p=p: pick_engine(p))
+            for p in PROVIDERS
+        ]
+        model_dd.options = [ft.dropdown.Option(m)
+                            for m in PROVIDERS[eng]["models"]]
+        model_dd.value = _cfg()["model"]
+        key_field.label = f"{PROVIDERS[eng]['label']} API key"
         keys_list.controls = [
             ft.Row([
                 ft.Icon(ft.Icons.KEY, size=14, color=TEAL),
@@ -431,82 +469,94 @@ def main(page: ft.Page):
                               icon_color=INK_SOFT,
                               on_click=lambda e, i=i: remove_key(i)),
             ], spacing=6)
-            for i, k in enumerate(_keys())
+            for i, k in enumerate(_cfg()["keys"])
         ]
         page.update()
 
+    def pick_engine(engine: str):
+        """Provider selected in the manager — confirm it if keys exist."""
+        state["key_engine"] = engine
+        if _cfg()["keys"]:
+            state["engine"] = engine
+        refresh_provider_panel()
+        refresh_engine_btn()
+
+    def on_model_change(e):
+        _cfg()["model"] = model_dd.value
+        save_providers(state["providers"])
+        refresh_engine_btn()
+
+    model_dd.on_select = on_model_change
+
     def remove_key(i: int):
-        _keys().pop(i)
-        save_keys(state["api_keys"])
-        refresh_keys_list()
-        if not _keys() and state["engine"] == state["key_engine"]:
+        _cfg()["keys"].pop(i)
+        save_providers(state["providers"])
+        refresh_provider_panel()
+        if not _cfg()["keys"] and state["engine"] == state["key_engine"]:
             state["engine"] = None
-            style_engine_buttons()
+            refresh_engine_btn()
         log(f"Key {i+1} removed.")
 
     def add_key(e=None):
         k = key_field.value.strip()
         if not k:
             return
-        if k in _keys():
+        if k in _cfg()["keys"]:
             log("That key is already saved.")
         else:
-            _keys().append(k)
-            save_keys(state["api_keys"])
-            log(f"{ENGINE_LABEL[state['key_engine']]} key "
-                f"{len(_keys())} added ({_mask(k)}).", ok=True)
+            _cfg()["keys"].append(k)
+            save_providers(state["providers"])
+            log(f"{PROVIDERS[state['key_engine']]['label']} key "
+                f"{len(_cfg()['keys'])} added ({_mask(k)}).", ok=True)
         key_field.value = ""
-        refresh_keys_list()
-        state["engine"] = state["key_engine"]
-        style_engine_buttons()
+        refresh_provider_panel()
+        if _cfg()["keys"]:
+            state["engine"] = state["key_engine"]
+            refresh_engine_btn()
 
     def close_key_dialog(e=None):
         # Done also commits any key still sitting in the input field.
         if key_field.value and key_field.value.strip():
             add_key()
         key_dialog.open = False
-        if _keys():
+        if _cfg()["keys"]:
             state["engine"] = state["key_engine"]
-            style_engine_buttons()
-            log(f"Engine: {ENGINE_LABEL[state['key_engine']]} ready "
-                f"({len(_keys())} key(s) saved).")
+            refresh_engine_btn()
+            log(f"Engine: {engine_caption()} ready "
+                f"({len(_cfg()['keys'])} key(s) saved).")
         page.update()
 
     key_dialog = ft.AlertDialog(
         modal=True,
-        title=ft.Text("API keys", size=15, weight=ft.FontWeight.W_600),
+        title=ft.Text("Scan Model", size=15, weight=ft.FontWeight.W_600),
         content=ft.Container(
             ft.Column([
+                provider_row,
+                model_dd,
                 keys_list,
                 ft.Row([key_field,
                         ft.IconButton(ft.Icons.ADD_CIRCLE_OUTLINE,
                                       icon_color=TEAL, tooltip="Add key",
                                       on_click=add_key)], spacing=6),
-                ft.Text("If one key hits its limit, the next key is "
-                        "used automatically.", size=11, color=INK_SOFT),
+                ft.Text("Pick a provider, choose its model, then add key(s). "
+                        "If one key hits its limit, the next is used "
+                        "automatically.", size=11, color=INK_SOFT),
             ], tight=True, spacing=10),
-            width=380,
+            width=460,
         ),
         actions=[
             ft.FilledButton("Done", on_click=close_key_dialog),
         ],
     )
 
-    def open_key_manager(engine: str):
-        state["key_engine"] = engine
-        refresh_keys_list()
+    def open_key_manager(e=None):
+        state["key_engine"] = state["engine"] or "gemini"
+        refresh_provider_panel()
         key_dialog.open = True
         page.show_dialog(key_dialog)
-        if _keys():
-            state["engine"] = engine
-            style_engine_buttons()
         page.update()
 
-    def pick_engine(engine: str):
-        """Dropdown selection = confirm which engine to use, then manage keys."""
-        state["engine"] = engine
-        style_engine_buttons()
-        open_key_manager(engine)
+    engine_btn.on_click = open_key_manager
 
 
     # ------------------------------------------------------------- file pickers
@@ -578,15 +628,16 @@ def main(page: ft.Page):
         if not state["image_path"]:
             log("Load an image before scanning.")
             return
-        if state["engine"] not in ("gemini", "alibaba"):
-            log("Choose the Gemini Flash or Alibaba engine first.")
+        eng = state["engine"]
+        if not eng:
+            log("Pick a Scan Model first.")
+            open_key_manager()
             return
-        if not state["api_keys"][state["engine"]]:
-            log(f"Add an {ENGINE_LABEL[state['engine']]} API key first.")
-            open_key_manager(state["engine"])
+        if not state["providers"][eng]["keys"]:
+            log(f"Add a {PROVIDERS[eng]['label']} API key first.")
+            open_key_manager()
             return
-        page.run_task(run_gemini if state["engine"] == "gemini"
-                      else run_alibaba)
+        page.run_task(SCANNERS[eng])
 
     async def run_gemini():
         from google import genai
@@ -602,6 +653,7 @@ def main(page: ft.Page):
                     "webp": "image/webp", "bmp": "image/bmp"}.get(suffix, "image/jpeg")
             contents = [types.Part.from_bytes(data=img_bytes, mime_type=mime),
                         PROMPT]
+            model = state["providers"]["gemini"]["model"]
 
             def _retryable(err: Exception) -> bool:
                 s = str(err)
@@ -613,7 +665,7 @@ def main(page: ft.Page):
             # wait briefly, then move on to the next key.
             resp = None
             last_err = None
-            keys = state["api_keys"]["gemini"]
+            keys = state["providers"]["gemini"]["keys"]
             for ki, key in enumerate(keys):
                 if len(keys) > 1:
                     log(f"Using Gemini key {ki + 1} of {len(keys)}...")
@@ -621,7 +673,7 @@ def main(page: ft.Page):
                 for attempt in range(3):
                     try:
                         resp = client.models.generate_content(
-                            model=GEMINI_MODEL, contents=contents)
+                            model=model, contents=contents)
                         break
                     except Exception as ex:
                         last_err = ex
@@ -643,17 +695,25 @@ def main(page: ft.Page):
             return
         finish_scan(resp.text or "")
 
-    async def run_alibaba():
-        """Scan via Alibaba Model Studio (DashScope) qwen-vl-max.
+    def _retryable_http(err: Exception) -> bool:
+        s = str(err)
+        return any(t in s for t in ("500", "502", "503", "429",
+                                    "Throttling", "quota", "Timeout",
+                                    "overloaded"))
 
-        Uses the OpenAI-compatible endpoint; no extra SDK needed. Image is
-        sent as a base64 data URL inside a chat message.
+    async def run_openai_compatible(engine: str):
+        """Scan via an OpenAI-compatible endpoint (Alibaba / ChatGPT).
+
+        Image is sent as a base64 data URL inside a chat message.
         """
         import base64
         import urllib.request
 
+        cfg = state["providers"][engine]
+        label = PROVIDERS[engine]["label"]
+        url = PROVIDERS[engine]["url"]
         set_busy(True)
-        log("Alibaba Qwen-VL parser active: scanning tabular data...")
+        log(f"{label} ({cfg['model']}) parser active: scanning tabular data...")
         page.update()
         try:
             img_bytes = Path(state["image_path"]).read_bytes()
@@ -664,7 +724,7 @@ def main(page: ft.Page):
             data_url = (f"data:{mime};base64,"
                         + base64.b64encode(img_bytes).decode())
             payload = json.dumps({
-                "model": ALIBABA_MODEL,
+                "model": cfg["model"],
                 "messages": [{
                     "role": "user",
                     "content": [
@@ -677,35 +737,29 @@ def main(page: ft.Page):
 
             def _post(key: str) -> str:
                 req = urllib.request.Request(
-                    ALIBABA_URL, data=payload,
+                    url, data=payload,
                     headers={"Authorization": f"Bearer {key}",
                              "Content-Type": "application/json"})
                 with urllib.request.urlopen(req, timeout=120) as r:
                     body = json.loads(r.read().decode())
                 return body["choices"][0]["message"]["content"]
 
-            def _retryable(err: Exception) -> bool:
-                s = str(err)
-                return any(t in s for t in ("500", "502", "503", "429",
-                                            "Throttling", "quota",
-                                            "Timeout"))
-
             text = None
             last_err = None
-            keys = state["api_keys"]["alibaba"]
+            keys = cfg["keys"]
             for ki, key in enumerate(keys):
                 if len(keys) > 1:
-                    log(f"Using Alibaba key {ki + 1} of {len(keys)}...")
+                    log(f"Using {label} key {ki + 1} of {len(keys)}...")
                 for attempt in range(3):
                     try:
                         text = await asyncio.to_thread(_post, key)
                         break
                     except Exception as ex:
                         last_err = ex
-                        if not _retryable(ex):
+                        if not _retryable_http(ex):
                             raise
                         if attempt < 2:
-                            log(f"Alibaba busy — retrying in "
+                            log(f"{label} busy — retrying in "
                                 f"{2 * (attempt + 1)}s...")
                             await asyncio.sleep(2 * (attempt + 1))
                 if text is not None:
@@ -715,10 +769,87 @@ def main(page: ft.Page):
             if text is None:
                 raise last_err
         except Exception as ex:
-            log(f"Alibaba request failed: {ex}")
+            log(f"{label} request failed: {ex}")
             set_busy(False)
             return
         finish_scan(text)
+
+    async def run_anthropic():
+        """Scan via Anthropic Messages API (Claude vision)."""
+        import base64
+        import urllib.request
+
+        cfg = state["providers"]["anthropic"]
+        set_busy(True)
+        log(f"Claude ({cfg['model']}) parser active: scanning tabular data...")
+        page.update()
+        try:
+            img_bytes = Path(state["image_path"]).read_bytes()
+            suffix = Path(state["image_path"]).suffix.lower().lstrip(".")
+            mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+                    "webp": "image/webp", "bmp": "image/bmp"}.get(suffix,
+                                                                  "image/jpeg")
+            payload = json.dumps({
+                "model": cfg["model"],
+                "max_tokens": 4096,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        {"type": "image",
+                         "source": {"type": "base64", "media_type": mime,
+                                    "data": base64.b64encode(img_bytes).decode()}},
+                        {"type": "text", "text": PROMPT},
+                    ],
+                }],
+            }).encode()
+
+            def _post(key: str) -> str:
+                req = urllib.request.Request(
+                    PROVIDERS["anthropic"]["url"], data=payload,
+                    headers={"x-api-key": key,
+                             "anthropic-version": "2023-06-01",
+                             "Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    body = json.loads(r.read().decode())
+                return "".join(b.get("text", "")
+                               for b in body.get("content", []))
+
+            text = None
+            last_err = None
+            keys = cfg["keys"]
+            for ki, key in enumerate(keys):
+                if len(keys) > 1:
+                    log(f"Using Claude key {ki + 1} of {len(keys)}...")
+                for attempt in range(3):
+                    try:
+                        text = await asyncio.to_thread(_post, key)
+                        break
+                    except Exception as ex:
+                        last_err = ex
+                        if not _retryable_http(ex):
+                            raise
+                        if attempt < 2:
+                            log(f"Claude busy — retrying in "
+                                f"{2 * (attempt + 1)}s...")
+                            await asyncio.sleep(2 * (attempt + 1))
+                if text is not None:
+                    break
+                if ki + 1 < len(keys):
+                    log(f"Key {ki + 1} failed — switching to key {ki + 2}.")
+            if text is None:
+                raise last_err
+        except Exception as ex:
+            log(f"Claude request failed: {ex}")
+            set_busy(False)
+            return
+        finish_scan(text)
+
+    SCANNERS = {
+        "gemini": run_gemini,
+        "alibaba": lambda: run_openai_compatible("alibaba"),
+        "openai": lambda: run_openai_compatible("openai"),
+        "anthropic": run_anthropic,
+    }
 
     def finish_scan(raw: str):
         try:
@@ -930,15 +1061,15 @@ def main(page: ft.Page):
         )
     )
 
-    style_engine_buttons()
-    if state["api_keys"]["gemini"] or state["api_keys"]["alibaba"]:
-        state["engine"] = ("gemini" if state["api_keys"]["gemini"]
-                           else "alibaba")
-        style_engine_buttons()
-        log(f"App initialized. Engine: {ENGINE_LABEL[state['engine']]} "
-            f"({len(state['api_keys'][state['engine']])} saved key(s)).")
+    refresh_engine_btn()
+    ready = [p for p in PROVIDERS if state["providers"][p]["keys"]]
+    if ready:
+        state["engine"] = ready[0]
+        refresh_engine_btn()
+        log(f"App initialized. {engine_caption()} "
+            f"({len(state['providers'][state['engine']]['keys'])} saved key(s)).")
     else:
-        log("App initialized. Select an engine and add your API key.")
+        log("App initialized. Click 'Scan Model' and add your API key.")
     log("Waiting for image payload...")
 
 
