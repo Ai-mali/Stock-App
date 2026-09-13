@@ -376,18 +376,33 @@ def main(page: ft.Page):
         return serial_count
 
     # ------------------------------------------------------------- engine buttons
-    model_btn = ft.Button("Model")
-    gemini_btn = ft.Button("Gemini Flash")
-    alibaba_btn = ft.Button("Alibaba")
+    ENGINE_LABEL = {"gemini": "Gemini Flash", "alibaba": "Alibaba (Qwen-VL)"}
 
     def style_engine_buttons():
-        for name, btn in (("model", model_btn), ("gemini", gemini_btn),
-                          ("alibaba", alibaba_btn)):
-            btn.bgcolor = (ENGINE_GRAY_ACTIVE if state["engine"] == name
-                           else ENGINE_GRAY)
-            btn.color = INK
-            btn.elevation = 0
+        engine_btn.content = ft.Row(
+            [ft.Icon(ft.Icons.MEMORY, size=16, color=INK),
+             ft.Text(ENGINE_LABEL.get(state["engine"], "Scanner Model"),
+                     color=INK, size=13, weight=ft.FontWeight.W_500,
+                     no_wrap=True),
+             ft.Icon(ft.Icons.ARROW_DROP_DOWN, size=18, color=INK)],
+            spacing=6, tight=True,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER)
         page.update()
+
+    engine_btn = ft.PopupMenuButton(
+        content=ft.Row([ft.Text("Scanner Model")], tight=True),
+        bgcolor=ENGINE_GRAY,
+        style=ft.ButtonStyle(padding=ft.Padding(14, 8, 14, 8),
+                             elevation=0),
+        items=[
+            ft.PopupMenuItem(
+                content=ft.Text("Gemini Flash"),
+                on_click=lambda e: pick_engine("gemini")),
+            ft.PopupMenuItem(
+                content=ft.Text("Alibaba (Qwen-VL)"),
+                on_click=lambda e: pick_engine("alibaba")),
+        ],
+    )
 
     # ------------------------------------------------------------- API key manager
     # Multiple keys are supported: if one key hits a quota/error mid-scan the
@@ -396,7 +411,6 @@ def main(page: ft.Page):
                              label="API key", hint_text="Paste a new API key",
                              dense=True)
     keys_list = ft.Column(spacing=4)
-    ENGINE_LABEL = {"gemini": "Gemini Flash", "alibaba": "Alibaba (Qwen-VL)"}
 
     def _mask(k: str) -> str:
         return k[:6] + "..." + k[-4:] if len(k) > 12 else "****"
@@ -485,14 +499,12 @@ def main(page: ft.Page):
             style_engine_buttons()
         page.update()
 
-    def pick_model(e):
-        state["engine"] = "model"
+    def pick_engine(engine: str):
+        """Dropdown selection = confirm which engine to use, then manage keys."""
+        state["engine"] = engine
         style_engine_buttons()
-        log("Local 'Model' engine selected — backend not implemented yet.")
+        open_key_manager(engine)
 
-    model_btn.on_click = pick_model
-    gemini_btn.on_click = lambda e: open_key_manager("gemini")
-    alibaba_btn.on_click = lambda e: open_key_manager("alibaba")
 
     # ------------------------------------------------------------- file pickers
     img_picker = ft.FilePicker()
@@ -796,7 +808,7 @@ def main(page: ft.Page):
                 ft.Text("Model & Serial Extractor", size=16,
                         weight=ft.FontWeight.W_600),
                 ft.Container(expand=True),
-                model_btn, gemini_btn, alibaba_btn,
+                engine_btn,
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=10,
