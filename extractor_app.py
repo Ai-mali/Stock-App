@@ -16,7 +16,7 @@ from pathlib import Path
 
 import flet as ft
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash"
 CONFIG_PATH = Path.home() / ".model_serial_extractor.json"
 
 PROMPT = """Extract model number and serial number from this Daikin equipment parts list.
@@ -229,6 +229,7 @@ def main(page: ft.Page):
             save_key(state["api_key"])
         key_dialog.open = False
         if state["api_key"]:
+            state["engine"] = "gemini"
             log("Gemini API key set. Engine: Gemini Flash ready.")
         else:
             state["engine"] = None
