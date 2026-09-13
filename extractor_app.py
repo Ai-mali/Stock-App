@@ -26,9 +26,10 @@ Serial = serial number after Serial No:.
 If multiple serial numbers for same model, separate with comma.
 Keep serial ranges as written, e.g. "K016634 - K016636".
 Desc = the description text of the line item.
+Qty = quantity number from the Quantity column.
 Ignore handwritten checkmarks next to serials.
 Return ONLY JSON array, one object per row including rows without serials:
-[{"no":"","model":"","serial":"","desc":""}]
+[{"no":"","model":"","serial":"","qty":"","desc":""}]
 Leave serial empty when the row has no serial number.
 """
 
@@ -83,8 +84,9 @@ def parse_gemini_json(raw: str) -> list[dict]:
         serial = expand_serial_range(str(item.get("serial", "")).strip())
         desc = str(item.get("desc", "")).strip()
         no = str(item.get("no", "")).strip()
+        qty = str(item.get("qty", "")).strip()
         if model and (serial or desc):
-            rows.append({"no": no, "model": model.upper(),
+            rows.append({"no": no, "model": model.upper(), "qty": qty,
                          "serial": serial.upper(), "desc": desc})
     return rows
 
@@ -103,13 +105,14 @@ def save_key(key: str) -> None:
         pass
 
 
-def card(content, padding=18):
+def card(content, padding=18, expand=None):
     return ft.Container(
         content=content,
         bgcolor=CARD,
         border=ft.Border.all(1, LINE),
         border_radius=10,
         padding=padding,
+        expand=expand,
     )
 
 
@@ -148,15 +151,34 @@ def main(page: ft.Page):
             alignment=ft.MainAxisAlignment.CENTER,
             spacing=8,
         ),
-        height=420,
+        height=260,
         border_radius=8,
         border=ft.Border.all(1, LINE),
         bgcolor="#FAFBFC",
         alignment=ft.Alignment(0, 0),
     )
+    zoom_dialog = ft.AlertDialog(
+        modal=True,
+        content=ft.Container(
+            ft.Image(src="", fit=ft.BoxFit.CONTAIN),
+            width=900, height=560,
+        ),
+        content_padding=8,
+    )
+
+    def open_zoom(e):
+        if not state["image_path"]:
+            return
+        zoom_dialog.content.content.src = state["image_path"]
+        zoom_dialog.open = True
+        page.show_dialog(zoom_dialog)
+        page.update()
+
     img_frame = ft.Container(
         content=ft.Stack([img_empty, img_preview]),
-        height=420, border_radius=8,
+        height=260, border_radius=8,
+        on_click=open_zoom,
+        tooltip="Click to zoom",
     )
 
     badge = ft.Container(
@@ -174,8 +196,10 @@ def main(page: ft.Page):
     no_col = ft.DataColumn(label=col_label("No"))
     model_col = ft.DataColumn(label=col_label("Model"))
     serial_col = ft.DataColumn(label=col_label("Serial"))
+    qty_col = ft.DataColumn(label=col_label("Qty"))
     results_table = ft.DataTable(
-        columns=[no_col, model_col, serial_col],
+        columns=[no_col, model_col, serial_col, qty_col,
+                 ft.DataColumn(label=col_label(""))],
         rows=[],
         heading_row_color="#F5F7F8",
         border=ft.Border.all(1, LINE),
@@ -183,7 +207,7 @@ def main(page: ft.Page):
         column_spacing=24,
         width=None,
     )
-    results_scroll = ft.Column([results_table], scroll=ft.ScrollMode.AUTO, height=270)
+    results_scroll = ft.Column([results_table], scroll=ft.ScrollMode.AUTO, expand=True)
 
     log_list = ft.ListView(spacing=2, height=140, auto_scroll=True)
 
@@ -206,12 +230,19 @@ def main(page: ft.Page):
                             italic=not r["serial"],
                             color=INK if r["serial"] else INK_SOFT)
                 ),
-            ]) for r in rows
+                ft.DataCell(ft.Text(r.get("qty", ""), size=13)),
+                ft.DataCell(
+                    ft.IconButton(ft.Icons.EDIT_OUTLINED, icon_size=16,
+                                  tooltip="Edit row", icon_color=INK_SOFT,
+                                  on_click=lambda e, i=i: open_edit(i))
+                ),
+            ]) for i, r in enumerate(rows)
         ]
         serial_count = sum(len([s for s in r["serial"].split(",") if s.strip()])
                            for r in rows if r["serial"])
         model_col.label.value = f"Model ({len(rows)})"
         serial_col.label.value = f"Serial ({serial_count})"
+        qty_col.label.value = "Qty"
         badge.content.controls[1].value = f"{len(rows)} models found"
         badge.visible = bool(rows)
         page.update()
@@ -320,9 +351,10 @@ def main(page: ft.Page):
         try:
             with open(target, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
-                w.writerow(["No", "Model", "Serial"])
+                w.writerow(["No", "Model", "Serial", "Qty"])
                 for r in state["rows"]:
-                    w.writerow([r["no"], r["model"], r["serial"] or r["desc"]])
+                    w.writerow([r["no"], r["model"], r["serial"] or r["desc"],
+                                r.get("qty", "")])
             log(f"Exported {len(state['rows'])} row(s) to {target}", ok=True)
         except Exception as ex:
             log(f"CSV export failed: {ex}")
@@ -381,6 +413,61 @@ def main(page: ft.Page):
         badge.visible = False
         log_list.controls.clear()
         log("Cleared. Waiting for image payload...")
+
+    # ------------------------------------------------------------- row edit dialog
+    edit_no = ft.TextField(label="No", dense=True)
+    edit_model = ft.TextField(label="Model", dense=True)
+    edit_serial = ft.TextField(label="Serial (comma-separated)", dense=True)
+    edit_qty = ft.TextField(label="Qty", dense=True)
+    edit_idx = {"i": -1}
+
+    edit_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Edit row", size=15, weight=ft.FontWeight.W_600),
+        content=ft.Column([edit_no, edit_model, edit_serial, edit_qty],
+                          tight=True, spacing=10),
+        actions=[
+            ft.TextButton("Cancel", on_click=lambda e: close_edit()),
+            ft.FilledButton("Save", on_click=lambda e: save_edit()),
+        ],
+    )
+
+    def open_edit(i: int):
+        edit_idx["i"] = i
+        r = state["rows"][i]
+        edit_no.value = r["no"]
+        edit_model.value = r["model"]
+        edit_serial.value = r["serial"] or r["desc"]
+        edit_qty.value = r.get("qty", "")
+        edit_dialog.open = True
+        page.show_dialog(edit_dialog)
+        page.update()
+
+    def close_edit():
+        edit_dialog.open = False
+        page.update()
+
+    def save_edit():
+        i = edit_idx["i"]
+        if i < 0:
+            close_edit()
+            return
+        r = state["rows"][i]
+        r["no"] = edit_no.value.strip()
+        r["model"] = edit_model.value.strip().upper()
+        val = edit_serial.value.strip()
+        # If the value looks like serials (letters+digits), store as serial;
+        # otherwise keep it as a description fallback.
+        if re.match(r"^[A-Z0-9,\s\-–]+$", val.upper()) and re.search(r"\d", val):
+            r["serial"] = expand_serial_range(val.upper())
+            r["desc"] = r.get("desc", "")
+        else:
+            r["desc"] = val
+            r["serial"] = ""
+        r["qty"] = edit_qty.value.strip()
+        set_results(state["rows"])
+        close_edit()
+        log(f"Row {r['no'] or i+1} updated.")
 
     # ------------------------------------------------------------- layout
     header = ft.Container(
@@ -453,7 +540,9 @@ def main(page: ft.Page):
                 results_scroll,
             ],
             spacing=10,
-        )
+            expand=True,
+        ),
+        expand=True,
     )
 
     log_card = card(
@@ -482,8 +571,13 @@ def main(page: ft.Page):
                 header,
                 ft.Row(
                     [
-                        ft.Column([left_card], expand=5),
-                        ft.Column([results_card, log_card], expand=5, spacing=16),
+                        ft.Column(
+                            [left_card, log_card],
+                            expand=5, spacing=16,
+                            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+                        ),
+                        ft.Column([results_card], expand=6,
+                                  horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
                     ],
                     vertical_alignment=ft.CrossAxisAlignment.START,
                     spacing=16,
