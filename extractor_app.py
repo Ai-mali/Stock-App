@@ -461,6 +461,9 @@ def main(page: ft.Page):
         style_engine_buttons()
 
     def close_key_dialog(e=None):
+        # Done also commits any key still sitting in the input field.
+        if key_field.value and key_field.value.strip():
+            add_key()
         key_dialog.open = False
         if _keys():
             state["engine"] = state["key_engine"]
