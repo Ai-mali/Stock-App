@@ -20,13 +20,14 @@ GEMINI_MODEL = "gemini-3.5-flash"
 CONFIG_PATH = Path.home() / ".model_serial_extractor.json"
 
 PROMPT = """Extract model number and serial number from this Daikin equipment parts list.
-Model = equipment model code from description line.
+No = the line item number in the leftmost No column.
+Model = equipment model code from the Material column.
 Serial = serial number after Serial No:.
 If multiple serial numbers for same model, separate with comma.
 Keep serial ranges as written, e.g. "K016634 - K016636".
 Ignore handwritten checkmarks next to serials.
 Return ONLY JSON array:
-[{"model":"","serial":""}]
+[{"no":"","model":"","serial":""}]
 Skip rows with no serial number.
 """
 
@@ -79,8 +80,9 @@ def parse_gemini_json(raw: str) -> list[dict]:
             continue
         model = str(item.get("model", "")).strip()
         serial = expand_serial_range(str(item.get("serial", "")).strip())
+        no = str(item.get("no", "")).strip()
         if model and serial:
-            rows.append({"model": model.upper(), "serial": serial.upper()})
+            rows.append({"no": no, "model": model.upper(), "serial": serial.upper()})
     return rows
 
 
@@ -163,11 +165,14 @@ def main(page: ft.Page):
         visible=False,
     )
 
+    def col_label(text):
+        return ft.Text(text, weight=ft.FontWeight.W_500, color=INK_SOFT, size=12)
+
+    no_col = ft.DataColumn(label=col_label("No"))
+    model_col = ft.DataColumn(label=col_label("Model"))
+    serial_col = ft.DataColumn(label=col_label("Serial"))
     results_table = ft.DataTable(
-        columns=[
-            ft.DataColumn(label=ft.Text("Model", weight=ft.FontWeight.W_500, color=INK_SOFT, size=12)),
-            ft.DataColumn(label=ft.Text("Serial", weight=ft.FontWeight.W_500, color=INK_SOFT, size=12)),
-        ],
+        columns=[no_col, model_col, serial_col],
         rows=[],
         heading_row_color="#F5F7F8",
         border=ft.Border.all(1, LINE),
@@ -191,12 +196,15 @@ def main(page: ft.Page):
         state["rows"] = rows
         results_table.rows = [
             ft.DataRow(cells=[
+                ft.DataCell(ft.Text(r["no"], size=13, color=INK_SOFT)),
                 ft.DataCell(ft.Text(r["model"], size=13)),
                 ft.DataCell(ft.Text(r["serial"], size=13)),
             ]) for r in rows
         ]
         serial_count = sum(len([s for s in r["serial"].split(",") if s.strip()])
                            for r in rows)
+        model_col.label.value = f"Model ({len(rows)})"
+        serial_col.label.value = f"Serial ({serial_count})"
         badge.content.controls[1].value = f"{len(rows)} models found"
         badge.visible = bool(rows)
         page.update()
@@ -305,9 +313,9 @@ def main(page: ft.Page):
         try:
             with open(target, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
-                w.writerow(["Model", "Serial"])
+                w.writerow(["No", "Model", "Serial"])
                 for r in state["rows"]:
-                    w.writerow([r["model"], r["serial"]])
+                    w.writerow([r["no"], r["model"], r["serial"]])
             log(f"Exported {len(state['rows'])} row(s) to {target}", ok=True)
         except Exception as ex:
             log(f"CSV export failed: {ex}")
