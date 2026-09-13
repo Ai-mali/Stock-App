@@ -25,10 +25,11 @@ Model = equipment model code from the Material column.
 Serial = serial number after Serial No:.
 If multiple serial numbers for same model, separate with comma.
 Keep serial ranges as written, e.g. "K016634 - K016636".
+Desc = the description text of the line item.
 Ignore handwritten checkmarks next to serials.
-Return ONLY JSON array:
-[{"no":"","model":"","serial":""}]
-Skip rows with no serial number.
+Return ONLY JSON array, one object per row including rows without serials:
+[{"no":"","model":"","serial":"","desc":""}]
+Leave serial empty when the row has no serial number.
 """
 
 # ---------------------------------------------------------------- palette
@@ -80,9 +81,11 @@ def parse_gemini_json(raw: str) -> list[dict]:
             continue
         model = str(item.get("model", "")).strip()
         serial = expand_serial_range(str(item.get("serial", "")).strip())
+        desc = str(item.get("desc", "")).strip()
         no = str(item.get("no", "")).strip()
-        if model and serial:
-            rows.append({"no": no, "model": model.upper(), "serial": serial.upper()})
+        if model and (serial or desc):
+            rows.append({"no": no, "model": model.upper(),
+                         "serial": serial.upper(), "desc": desc})
     return rows
 
 
@@ -198,11 +201,15 @@ def main(page: ft.Page):
             ft.DataRow(cells=[
                 ft.DataCell(ft.Text(r["no"], size=13, color=INK_SOFT)),
                 ft.DataCell(ft.Text(r["model"], size=13)),
-                ft.DataCell(ft.Text(r["serial"], size=13)),
+                ft.DataCell(
+                    ft.Text(r["serial"] or r["desc"], size=13,
+                            italic=not r["serial"],
+                            color=INK if r["serial"] else INK_SOFT)
+                ),
             ]) for r in rows
         ]
         serial_count = sum(len([s for s in r["serial"].split(",") if s.strip()])
-                           for r in rows)
+                           for r in rows if r["serial"])
         model_col.label.value = f"Model ({len(rows)})"
         serial_col.label.value = f"Serial ({serial_count})"
         badge.content.controls[1].value = f"{len(rows)} models found"
@@ -315,7 +322,7 @@ def main(page: ft.Page):
                 w = csv.writer(f)
                 w.writerow(["No", "Model", "Serial"])
                 for r in state["rows"]:
-                    w.writerow([r["no"], r["model"], r["serial"]])
+                    w.writerow([r["no"], r["model"], r["serial"] or r["desc"]])
             log(f"Exported {len(state['rows'])} row(s) to {target}", ok=True)
         except Exception as ex:
             log(f"CSV export failed: {ex}")
