@@ -221,13 +221,29 @@ def main(page: ft.Page):
     zoom_img = ft.Image(src="", fit=ft.BoxFit.CONTAIN, expand=True)
 
     def _apply_zoom():
+        # ft.Offset units are fractions of the control size, so pixel drag
+        # distances are converted before being applied.
+        w = float(page.width or 900)
+        h = float(page.height or 600)
+        limit = max(0.0, zoom_state["scale"] - 1.0) + 0.25
+        fx = max(-limit, min(limit, zoom_state["dx"] / w))
+        fy = max(-limit, min(limit, zoom_state["dy"] / h))
         zoom_img.scale = ft.Scale(zoom_state["scale"])
-        zoom_img.offset = ft.Offset(zoom_state["dx"], zoom_state["dy"])
+        zoom_img.offset = ft.Offset(fx, fy)
         page.update()
 
+    def _pan_start(e):
+        zoom_state["lx"] = zoom_state["ly"] = 0.0
+
     def _pan(e):
-        zoom_state["dx"] += e.delta_x
-        zoom_state["dy"] += e.delta_y
+        # Flet 0.86 reports movement cumulative since drag start, so diff
+        # against the previous value to get this event's delta in pixels.
+        d = e.global_delta or e.local_delta
+        if not d:
+            return
+        zoom_state["dx"] += d.x - zoom_state.get("lx", 0.0)
+        zoom_state["dy"] += d.y - zoom_state.get("ly", 0.0)
+        zoom_state["lx"], zoom_state["ly"] = d.x, d.y
         _apply_zoom()
 
     def _zoom_by(factor):
@@ -255,6 +271,7 @@ def main(page: ft.Page):
                 content=ft.Container(zoom_img, expand=True,
                                      alignment=ft.Alignment(0, 0),
                                      clip_behavior=ft.ClipBehavior.HARD_EDGE),
+                on_pan_start=_pan_start,
                 on_pan_update=_pan,
                 on_double_tap=_dbl,
             ),
