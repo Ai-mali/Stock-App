@@ -124,6 +124,8 @@ def main(page: ft.Page):
     if page.window:
         page.window.width = 1180
         page.window.height = 780
+        page.window.min_width = 900
+        page.window.min_height = 600
 
     # ------------------------------------------------------------- state
     state = {
@@ -157,19 +159,34 @@ def main(page: ft.Page):
         bgcolor="#FAFBFC",
         alignment=ft.Alignment(0, 0),
     )
+    zoom_img = ft.Image(src="", fit=ft.BoxFit.CONTAIN)
+    zoom_box = ft.Container(zoom_img)
     zoom_dialog = ft.AlertDialog(
         modal=True,
-        content=ft.Container(
-            ft.Image(src="", fit=ft.BoxFit.CONTAIN),
-            width=900, height=560,
-        ),
-        content_padding=8,
+        content=ft.Stack([
+            zoom_box,
+            ft.Container(
+                ft.IconButton(ft.Icons.CLOSE, icon_size=18, icon_color=INK,
+                              bgcolor="#FFFFFFDD",
+                              on_click=lambda e: close_zoom()),
+                right=8, top=8,
+            ),
+        ]),
+        content_padding=0,
     )
+
+    def close_zoom():
+        zoom_dialog.open = False
+        page.update()
 
     def open_zoom(e):
         if not state["image_path"]:
             return
-        zoom_dialog.content.content.src = state["image_path"]
+        # Fit the zoom view to ~85% of the current window so it works on
+        # any screen size the app is shipped to.
+        zoom_box.width = max(400, (page.width or 1000) * 0.85)
+        zoom_box.height = max(300, (page.height or 700) * 0.75)
+        zoom_img.src = state["image_path"]
         zoom_dialog.open = True
         page.show_dialog(zoom_dialog)
         page.update()
@@ -190,26 +207,43 @@ def main(page: ft.Page):
         visible=False,
     )
 
-    def col_label(text):
-        return ft.Text(text, weight=ft.FontWeight.W_500, color=INK_SOFT, size=12)
+    # Custom table: proportional columns (flex weights) so the grid stays
+    # evenly spaced at any window size, with a frozen header and scrolling body.
+    FLEX = {"no": 1, "model": 3, "serial": 6, "qty": 2}
+    EDIT_W = 44
 
-    no_col = ft.DataColumn(label=col_label("No"))
-    model_col = ft.DataColumn(label=col_label("Model"))
-    serial_col = ft.DataColumn(label=col_label("Serial"))
-    qty_col = ft.DataColumn(label=col_label("Qty"))
-    results_table = ft.DataTable(
-        columns=[no_col, model_col, serial_col, qty_col,
-                 ft.DataColumn(label=col_label(""))],
-        rows=[],
-        heading_row_color="#F5F7F8",
+    def _head(text, flex=None, center=True):
+        return ft.Container(
+            ft.Text(text, weight=ft.FontWeight.W_500, color=INK_SOFT, size=12,
+                    text_align=ft.TextAlign.CENTER if center else ft.TextAlign.LEFT,
+                    no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
+            width=EDIT_W if flex == "fixed" else None,
+            expand=flex if isinstance(flex, int) else None,
+            alignment=ft.Alignment(0 if center else -1, 0),
+            padding=ft.Padding(8, 8, 8, 8),
+        )
+
+    head_no = _head("No", FLEX["no"])
+    head_model = _head("Model", FLEX["model"])
+    head_serial = _head("Serial", FLEX["serial"])
+    head_qty = _head("Qty", FLEX["qty"])
+    head_edit = _head("", "fixed")
+
+    table_header = ft.Container(
+        ft.Row([head_no, head_model, head_serial, head_qty, head_edit],
+               spacing=0),
+        bgcolor="#F5F7F8",
+        border=ft.Border.only(bottom=ft.BorderSide(1, LINE)),
+    )
+    results_body = ft.ListView(spacing=0, expand=True)
+    results_scroll = ft.Container(
+        ft.Column([table_header, results_body], spacing=0, expand=True),
         border=ft.Border.all(1, LINE),
         border_radius=8,
-        column_spacing=24,
-        width=None,
+        expand=True,
     )
-    results_scroll = ft.Column([results_table], scroll=ft.ScrollMode.AUTO, expand=True)
 
-    log_list = ft.ListView(spacing=2, height=140, auto_scroll=True)
+    log_list = ft.ListView(spacing=2, expand=True, auto_scroll=True)
 
     # ------------------------------------------------------------- helpers
     def log(msg: str, ok: bool = False):
@@ -221,28 +255,47 @@ def main(page: ft.Page):
 
     def set_results(rows: list[dict]):
         state["rows"] = rows
-        results_table.rows = [
-            ft.DataRow(cells=[
-                ft.DataCell(ft.Text(r["no"], size=13, color=INK_SOFT)),
-                ft.DataCell(ft.Text(r["model"], size=13)),
-                ft.DataCell(
-                    ft.Text(r["serial"] or r["desc"], size=13,
-                            italic=not r["serial"],
-                            color=INK if r["serial"] else INK_SOFT)
-                ),
-                ft.DataCell(ft.Text(r.get("qty", ""), size=13)),
-                ft.DataCell(
-                    ft.IconButton(ft.Icons.EDIT_OUTLINED, icon_size=16,
-                                  tooltip="Edit row", icon_color=INK_SOFT,
-                                  on_click=lambda e, i=i: open_edit(i))
-                ),
-            ]) for i, r in enumerate(rows)
-        ]
+
+        def cell(text, flex, center=True, **kw):
+            return ft.Container(
+                ft.Text(text, size=13,
+                        text_align=ft.TextAlign.CENTER if center else ft.TextAlign.LEFT,
+                        **kw),
+                expand=flex,
+                alignment=ft.Alignment(0 if center else -1, 0),
+                padding=ft.Padding(8, 8, 8, 8),
+            )
+
+        def qty_text(q):
+            if not q:
+                return ""
+            return f"{q} PC" if q == "1" else f"{q} PCS"
+
+        result_rows = []
+        for i, r in enumerate(rows):
+            result_rows.append(ft.Container(
+                ft.Row([
+                    cell(r["no"], FLEX["no"], color=INK_SOFT),
+                    cell(r["model"], FLEX["model"]),
+                    cell(r["serial"] or r["desc"], FLEX["serial"],
+                         italic=not r["serial"],
+                         color=INK if r["serial"] else INK_SOFT),
+                    cell(qty_text(r.get("qty", "")), FLEX["qty"], no_wrap=True),
+                    ft.Container(
+                        ft.IconButton(ft.Icons.EDIT_OUTLINED, icon_size=16,
+                                      tooltip="Edit row", icon_color=INK_SOFT,
+                                      on_click=lambda e, i=i: open_edit(i)),
+                        width=EDIT_W, alignment=ft.Alignment(0, 0),
+                    ),
+                ], spacing=0),
+                bgcolor="#FFFFFF" if i % 2 == 0 else "#FAFBFC",
+                border=ft.Border.only(bottom=ft.BorderSide(1, "#EEF1F3")),
+            ))
+        results_body.controls = result_rows
         serial_count = sum(len([s for s in r["serial"].split(",") if s.strip()])
                            for r in rows if r["serial"])
-        model_col.label.value = f"Model ({len(rows)})"
-        serial_col.label.value = f"Serial ({serial_count})"
-        qty_col.label.value = "Qty"
+        head_model.content.value = f"Model ({len(rows)})"
+        head_serial.content.value = f"Serial ({serial_count})"
         badge.content.controls[1].value = f"{len(rows)} models found"
         badge.visible = bool(rows)
         page.update()
@@ -559,10 +612,13 @@ def main(page: ft.Page):
                     border_radius=8,
                     padding=10,
                     bgcolor="#FAFBFC",
+                    expand=True,
                 ),
             ],
             spacing=10,
-        )
+            expand=True,
+        ),
+        expand=True,
     )
 
     page.add(
