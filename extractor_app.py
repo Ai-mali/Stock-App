@@ -844,10 +844,17 @@ def main(page: ft.Page):
             return
         finish_scan(text)
 
+    async def run_alibaba():
+        await run_openai_compatible("alibaba")
+
+    async def run_openai():
+        await run_openai_compatible("openai")
+
+    # page.run_task requires real coroutine functions — not plain lambdas.
     SCANNERS = {
         "gemini": run_gemini,
-        "alibaba": lambda: run_openai_compatible("alibaba"),
-        "openai": lambda: run_openai_compatible("openai"),
+        "alibaba": run_alibaba,
+        "openai": run_openai,
         "anthropic": run_anthropic,
     }
 
