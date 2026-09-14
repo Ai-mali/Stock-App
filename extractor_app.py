@@ -12,6 +12,7 @@ import csv
 import datetime
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -303,12 +304,18 @@ def main(page: ft.Page):
     def open_zoom(e):
         if not state["image_path"]:
             return
-        zoom_state.update(scale=1.0, dx=0.0, dy=0.0)
-        zoom_img.src = state["image_path"]
-        zoom_img.scale = ft.Scale(1.0)
-        zoom_img.offset = ft.Offset(0, 0)
-        zoom_overlay.visible = True
-        page.update()
+        # Separate OS window (Telegram-style): movable, resizable, free pan.
+        viewer = Path(__file__).with_name("image_viewer.py")
+        if viewer.exists():
+            subprocess.Popen([sys.executable, str(viewer),
+                              state["image_path"]])
+        else:  # fallback: in-app overlay
+            zoom_state.update(scale=1.0, dx=0.0, dy=0.0)
+            zoom_img.src = state["image_path"]
+            zoom_img.scale = ft.Scale(1.0)
+            zoom_img.offset = ft.Offset(0, 0)
+            zoom_overlay.visible = True
+            page.update()
 
     img_frame = ft.Container(
         content=ft.Stack([img_empty, img_preview]),
