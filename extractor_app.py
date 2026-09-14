@@ -59,6 +59,8 @@ Keep serial ranges as written, e.g. "K016634 - K016636".
 Desc = the description text of the line item.
 Qty = quantity number from the Quantity column.
 Ignore handwritten checkmarks next to serials.
+If a row's Material/model is cut off or belongs to a previous page, still
+return the serials with model left empty.
 Return ONLY JSON array, one object per row including rows without serials:
 [{"no":"","model":"","serial":"","qty":"","desc":""}]
 Leave serial empty when the row has no serial number.
@@ -76,6 +78,10 @@ ENGINE_GRAY = "#D9D9D9"
 ENGINE_GRAY_ACTIVE = "#B9B9B9"
 
 
+_RANGE_RE = re.compile(
+    r"([A-Za-z]{0,4})(\d{3,})\s*[-–]\s*([A-Za-z]{0,4})(\d{3,})")
+
+
 def expand_serial_range(text: str) -> str:
     """Expand inclusive ranges like 'K016634 - K016636' into individual serials.
 
@@ -90,9 +96,23 @@ def expand_serial_range(text: str) -> str:
             return m.group(0)
         return ", ".join(f"{pa}{i:0{len(na)}d}" for i in range(start, end + 1))
 
-    return re.sub(
-        r"([A-Za-z]{0,4})(\d{3,})\s*[-–]\s*([A-Za-z]{0,4})(\d{3,})", _sub, text
-    )
+    return _RANGE_RE.sub(_sub, text)
+
+
+def _split_ranges(text: str) -> str:
+    """Treat dashes as separators — 'A123 - A125' becomes 'A123, A125'."""
+    return _RANGE_RE.sub(r"\1\2, \3\4", text)
+
+
+def _serial_count(serial: str) -> int:
+    return len([s for s in serial.split(",") if s.strip()])
+
+
+def _qty_int(qty: str):
+    try:
+        return int(re.sub(r"[^0-9]", "", qty) or 0)
+    except ValueError:
+        return 0
 
 
 def parse_gemini_json(raw: str) -> list[dict]:
@@ -112,14 +132,45 @@ def parse_gemini_json(raw: str) -> list[dict]:
         if not isinstance(item, dict):
             continue
         model = str(item.get("model", "")).strip()
-        serial = expand_serial_range(str(item.get("serial", "")).strip())
+        raw_serial = str(item.get("serial", "")).strip()
         desc = str(item.get("desc", "")).strip()
         no = str(item.get("no", "")).strip()
         qty = str(item.get("qty", "")).strip()
-        if model and (serial or desc):
-            rows.append({"no": no, "model": model.upper(), "qty": qty,
-                         "serial": serial.upper(), "desc": desc})
+        # keep rows that have a model OR serials — a model cut off from a
+        # previous page still gets its serials, flagged for review
+        if not (model or raw_serial or desc):
+            continue
+        serial, flag = _resolve_serials(raw_serial, qty)
+        if not model:
+            flag = flag or "no_model"
+        rows.append({"no": no, "model": model.upper(), "qty": qty,
+                     "serial": serial.upper(), "desc": desc,
+                     "flag": flag or ""})
     return rows
+
+
+def _resolve_serials(raw_serial: str, qty: str) -> tuple:
+    """Pick the serial interpretation whose count matches Qty, else flag.
+
+    A dash inside a serial list is ambiguous: a real range (K361-K368) or a
+    separator the model read as a dash (K308 - K323 meaning two units).
+    Expand it only when the expanded count equals the printed quantity.
+    Returns (serial_text, flag).
+    """
+    if not raw_serial:
+        return "", ""
+    q = _qty_int(qty)
+    expanded = expand_serial_range(raw_serial)
+    split = _split_ranges(raw_serial) if _RANGE_RE.search(raw_serial) else None
+    if not q:
+        return expanded, ""
+    if _serial_count(expanded) == q:
+        return expanded, ""
+    if split and _serial_count(split) == q:
+        # dash was really a separator
+        return split, "qty_fixed"
+    # neither matches the printed quantity — keep expanded but flag for review
+    return expanded, "qty_mismatch"
 
 
 def load_providers() -> dict:
@@ -406,14 +457,32 @@ def main(page: ft.Page):
                 return ""
             return f"{q} PC" if q == "1" else f"{q} PCS"
 
+        FLAG_TIPS = {
+            "qty_mismatch": "Serial count doesn't match Qty — check this row",
+            "qty_fixed": "Dash was read as separate serials to match Qty — "
+                         "double-check",
+            "no_model": "No model on this line (may be cut off from the "
+                        "previous page)",
+        }
         result_rows = []
         for i, r in enumerate(rows):
+            flagged = bool(r.get("flag"))
             result_rows.append(ft.Container(
                 ft.Row([
                     cell(r["no"], FLEX["no"], color=INK_SOFT,
                          no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
-                    cell(r["model"], FLEX["model"],
-                         no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
+                    ft.Container(
+                        ft.Row([
+                            ft.Icon(ft.Icons.WARNING_AMBER, size=14,
+                                    color="#D97706",
+                                    tooltip=FLAG_TIPS.get(r["flag"], ""))
+                            if flagged else ft.Container(width=0),
+                            ft.Text(r["model"], size=13, no_wrap=True,
+                                    overflow=ft.TextOverflow.ELLIPSIS),
+                        ], spacing=4, tight=True),
+                        expand=FLEX["model"], alignment=ft.Alignment(0, 0),
+                        padding=ft.Padding(8, 8, 8, 8),
+                    ),
                     cell(r["serial"] or r["desc"], FLEX["serial"],
                          italic=not r["serial"],
                          color=INK if r["serial"] else INK_SOFT),
@@ -425,7 +494,8 @@ def main(page: ft.Page):
                         width=EDIT_W, alignment=ft.Alignment(0, 0),
                     ),
                 ], spacing=0),
-                bgcolor="#FFFFFF" if i % 2 == 0 else "#FAFBFC",
+                bgcolor="#FDECEA" if flagged else
+                        ("#FFFFFF" if i % 2 == 0 else "#FAFBFC"),
                 border=ft.Border.only(bottom=ft.BorderSide(1, "#EEF1F3")),
             ))
         results_body.controls = result_rows
@@ -1036,6 +1106,11 @@ def main(page: ft.Page):
         n_serial = set_results(rows)
         if rows:
             log(f"Extract complete. {len(rows)} models and {n_serial} serial numbers found.", ok=True)
+            flagged = [(r["no"], r["flag"]) for r in rows if r.get("flag")]
+            if flagged:
+                names = ", ".join(f"No {n or '?'}" for n, _ in flagged)
+                log(f"⚠ {len(flagged)} row(s) need review: {names} — "
+                    f"hover the warning icon or open the row to fix.")
         else:
             log("Extraction returned no model/serial pairs.")
 
@@ -1101,6 +1176,14 @@ def main(page: ft.Page):
             r["desc"] = val
             r["serial"] = ""
         r["qty"] = edit_qty.value.strip()
+        # re-evaluate the warning flag against the corrected values
+        q = _qty_int(r["qty"])
+        if not r["model"]:
+            r["flag"] = "no_model"
+        elif r["serial"] and q and _serial_count(r["serial"]) != q:
+            r["flag"] = "qty_mismatch"
+        else:
+            r["flag"] = ""
         set_results(state["rows"])
         close_edit()
         log(f"Row {r['no'] or i+1} updated.")
