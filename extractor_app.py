@@ -189,6 +189,7 @@ def main(page: ft.Page):
         "engine": None,          # None | provider key
         "key_engine": "gemini",  # provider currently shown in the manager
         "image_path": None,
+        "busy": False,
         "rows": [],
     }
 
@@ -601,11 +602,15 @@ def main(page: ft.Page):
         if not path:
             log("Could not get file path for the selected image.")
             return
+        # lock buttons while the image decodes/previews (large photos take a moment)
+        state["busy"] = True
+        _update_buttons()
         state["image_path"] = path
         img_preview.src = path
         img_preview.visible = True
         img_empty.visible = False
-        page.update()
+        state["busy"] = False
+        _update_buttons()
         log(f"Parts list image loaded successfully. ({files[0].name})")
 
     async def export_csv(e):
@@ -631,11 +636,19 @@ def main(page: ft.Page):
             log(f"CSV export failed: {ex}")
 
     # ------------------------------------------------------------- scan
-    def set_busy(busy: bool):
-        """Give the buttons a live/loading feel while a scan runs."""
-        scan_btn.disabled = busy
+    def _update_buttons():
+        busy = state["busy"]
+        # SCAN stays locked until an image is loaded; everything locks during a scan.
+        locked = busy or not state["image_path"]
+        scan_btn.disabled = locked
+        scan_btn.bgcolor = "#8A8F94" if locked else TEAL
         load_btn.disabled = busy
         clear_btn.disabled = busy
+        page.update()
+
+    def set_busy(busy: bool):
+        """Give the buttons a live/loading feel while a scan runs."""
+        state["busy"] = busy
         if busy:
             scan_btn.content = ft.Row(
                 [ft.ProgressRing(width=16, height=16, stroke_width=2,
@@ -646,7 +659,7 @@ def main(page: ft.Page):
         else:
             scan_btn.content = ft.Text("SCAN", size=14, weight=ft.FontWeight.W_600)
             scan_btn.icon = ft.Icons.QR_CODE_SCANNER
-        page.update()
+        _update_buttons()
 
     def do_scan(e):
         if not state["image_path"]:
@@ -902,6 +915,7 @@ def main(page: ft.Page):
         img_preview.visible = False
         img_preview.src = ""
         img_empty.visible = True
+        _update_buttons()  # re-lock SCAN once the image is cleared
         set_results([])
         badge.visible = False
         log_list.controls.clear()
@@ -1093,6 +1107,7 @@ def main(page: ft.Page):
     )
 
     refresh_engine_btn()
+    _update_buttons()  # SCAN locked until an image is loaded
     ready = [p for p in PROVIDERS if state["providers"][p]["keys"]]
     if ready:
         state["engine"] = ready[0]
