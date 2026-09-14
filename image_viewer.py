@@ -57,8 +57,10 @@ def main(page: ft.Page):
         apply()
 
     def wheel(e):
-        # ScrollEvent delta is negative when scrolling up (zoom in).
-        zoom_by(1.12 if e.scroll_delta_y < 0 else 0.89)
+        d = getattr(e, "scroll_delta", None)
+        if d is None:
+            return
+        zoom_by(1.12 if d.y < 0 else 0.89)
 
     def fit(e=None):
         state.update(scale=1.0, dx=0.0, dy=0.0)
