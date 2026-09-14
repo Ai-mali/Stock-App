@@ -20,9 +20,16 @@ import flet as ft
 
 CONFIG_PATH = Path.home() / ".model_serial_extractor.json"
 
-# Set once the Stock Tracker is merged in — the real Stock In save function
-# (duplicate check + new-Type modal + Excel write) will be wired here.
-stock_store = None
+# Real Stock In save path — the same store the manual form uses
+# (duplicate-serial check + new-Type assignment + Excel write).
+sys.path.insert(0, str(Path(__file__).parent))
+try:
+    from stock_store import StockStore
+    stock_store = StockStore()
+    STOCK_ERR = ""
+except Exception as _ex:  # surfaced in the Status Log
+    stock_store = None
+    STOCK_ERR = str(_ex)
 
 # Supported scan providers. Each holds its own key list and picked model.
 PROVIDERS = {
@@ -1174,21 +1181,90 @@ def main(page: ft.Page):
             log("This row needs a Model and Serial before it can be added.")
             return
         date_in = date_in_field.value.strip()
-        log(f"Adding No {r['no'] or i + 1} — {r['model']} "
-            f"({_serial_count(r['serial'])} serial(s)) · "
-            f"{supplier} · {date_in}")
         if stock_store is None:
-            log("⚠ Stock Tracker not connected yet — nothing was saved. "
-                "The row-send button is wired and waiting for the merge.")
+            log("⚠ daikin_stock.xlsx not available — nothing was saved.")
             return
-        ok, dupes = stock_store.stock_in(
+        pending_send["i"] = i
+        _commit_send(supplier, r, date_in)
+
+    def _commit_send(supplier: str, r: dict, date_in: str):
+        i = pending_send["i"]
+        serials = [s.strip() for s in r["serial"].split(",") if s.strip()]
+        added, dupes, ok_type = stock_store.stock_in(
             supplier=supplier, model=r["model"],
-            serials=r["serial"].split(","), date_in=date_in)
-        if ok:
-            state["added"].add(i)
+            serials=serials, date_in=date_in)
+        if not ok_type:
+            open_type_modal(r["model"])  # batch held until Type is chosen
+            return
+        _finish_send(r, added, dupes)
+
+    def _finish_send(r: dict, added: list, dupes: list):
+        if added:
+            state["added"].add(pending_send["i"])
+            log(f"ADDED {len(added)} UNIT(S) OF {r['model'].upper()}.", ok=True)
             set_results(state["rows"])
         if dupes:
             log(f"DUPLICATED SERIAL NUMBER: {', '.join(dupes).upper()}")
+
+    # ---- new-Model Type assignment (same modal as Stock In spec)
+    pending_send = {"i": -1, "supplier": "", "date_in": ""}
+    type_dd = ft.Dropdown(label="Existing Type", dense=True)
+    type_new = ft.TextField(label="Or new Type name", dense=True)
+    type_err = ft.Text("", color="#DC2626", size=12, visible=False)
+    type_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("", size=15, weight=ft.FontWeight.W_600),
+        content=ft.Container(
+            ft.Column([type_dd, ft.Text("— OR —", size=11, color=INK_SOFT),
+                       type_new, type_err],
+                      tight=True, spacing=10,
+                      alignment=ft.MainAxisAlignment.START),
+            width=360, height=190),
+        actions=[
+            ft.TextButton("Cancel", on_click=lambda e: close_type_modal()),
+            ft.FilledButton("Confirm", on_click=lambda e: confirm_type_modal()),
+        ],
+    )
+    page.overlay.append(type_dialog)
+
+    def open_type_modal(model: str):
+        pending_send["supplier"] = supplier_field.value.strip()
+        pending_send["date_in"] = date_in_field.value.strip()
+        type_dd.options = [ft.dropdown.Option(t) for t in stock_store.types]
+        type_dd.value = None
+        type_new.value = ""
+        type_err.visible = False
+        type_dialog.title.value = (
+            f'New model "{model.upper()}" needs a Type. '
+            f"Pick one, or add a new one below.")
+        type_dialog.open = True
+        page.update()
+
+    def close_type_modal():
+        # Cancel discards the pending row — nothing saves, model not remembered
+        type_dialog.open = False
+        pending_send["i"] = -1
+        page.update()
+
+    def confirm_type_modal():
+        chosen = type_new.value.strip() or (type_dd.value or "")
+        if not chosen:
+            type_err.value = "Pick an existing Type, or enter a new one."
+            type_err.visible = True
+            page.update()
+            return
+        i = pending_send["i"]
+        type_dialog.open = False
+        if i >= 0:
+            r = state["rows"][i]
+            serials = [s.strip() for s in r["serial"].split(",") if s.strip()]
+            added, dupes = stock_store.stock_in_with_type(
+                supplier=pending_send["supplier"], model=r["model"],
+                serials=serials, date_in=pending_send["date_in"],
+                type_name=chosen)
+            _finish_send(r, added, dupes)
+        pending_send["i"] = -1
+        page.update()
 
     # ------------------------------------------------------------- row edit dialog
     edit_no = ft.TextField(label="No", dense=True)
@@ -1383,26 +1459,64 @@ def main(page: ft.Page):
         expand=True,
     )
 
+    stock_in_row = ft.Row(
+        [
+            ft.Column(
+                [left_card, log_card],
+                expand=5, spacing=16,
+                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            ),
+            ft.Column([results_card], expand=6,
+                      horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
+        ],
+        vertical_alignment=ft.CrossAxisAlignment.START,
+        spacing=16,
+        expand=True,
+    )
+
+    # ---- Stock Tracker nav: the extractor IS screen 1 (Stock In);
+    # screens 3/4/5 are ported one at a time into these tabs.
+    TABS = ["1  Stock In", "3  Available Stock", "4  Stock Out",
+            "5  Track List"]
+    nav_btns = {}
+    placeholder_text = ft.Text("", color=INK_SOFT, size=13)
+    placeholder = ft.Container(
+        content=ft.Column(
+            [ft.Icon(ft.Icons.CONSTRUCTION, size=44, color=INK_SOFT),
+             placeholder_text],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.CENTER, spacing=8),
+        bgcolor=CARD, border_radius=12, border=ft.Border.all(1, LINE),
+        expand=True, visible=False,
+    )
+
+    def switch_tab(name):
+        is_in = name == TABS[0]
+        stock_in_row.visible = is_in
+        placeholder.visible = not is_in
+        if not is_in:
+            placeholder_text.value = f"{name.strip()} — coming next"
+        for n, b in nav_btns.items():
+            active = n == name
+            b.bgcolor = TEAL if active else "#EDF0F2"
+            b.content.color = "white" if active else INK_SOFT
+        page.update()
+
+    for t in TABS:
+        b = ft.Button(content=ft.Text(t, size=12.5,
+                                      weight=ft.FontWeight.W_600),
+                      on_click=lambda e, t=t: switch_tab(t), elevation=0)
+        nav_btns[t] = b
+    nav_bar = ft.Row(list(nav_btns.values()), spacing=8)
+
     page.add(
         ft.Stack(
             [
                 ft.Column(
                     [
                         header,
-                        ft.Row(
-                            [
-                                ft.Column(
-                                    [left_card, log_card],
-                                    expand=5, spacing=16,
-                                    horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-                                ),
-                                ft.Column([results_card], expand=6,
-                                          horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-                            ],
-                            vertical_alignment=ft.CrossAxisAlignment.START,
-                            spacing=16,
-                            expand=True,
-                        ),
+                        nav_bar,
+                        ft.Stack([stock_in_row, placeholder], expand=True),
                     ],
                     expand=True,
                 ),
@@ -1411,6 +1525,7 @@ def main(page: ft.Page):
             expand=True,
         )
     )
+    switch_tab(TABS[0])
 
     refresh_engine_btn()
     _update_buttons()  # SCAN locked until an image is loaded
@@ -1422,6 +1537,9 @@ def main(page: ft.Page):
             f"({len(state['providers'][state['engine']]['keys'])} saved key(s)).")
     else:
         log("App initialized. Click 'Scan Model' and add your API key.")
+    if stock_store is None:
+        log(f"⚠ daikin_stock.xlsx could not be opened ({STOCK_ERR}) — "
+            f"send arrows will not save to stock.")
     log("Waiting for image payload...")
 
 
