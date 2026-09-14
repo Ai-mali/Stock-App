@@ -674,6 +674,11 @@ def main(page: ft.Page):
             log(f"Add a {PROVIDERS[eng]['label']} API key first.")
             open_key_manager()
             return
+        # instant feedback — confirm the click before network work starts
+        cfg = state["providers"][eng]
+        log(f"Scan button clicked — sending image to {PROVIDERS[eng]['label']} "
+            f"({cfg['model']}), waiting for response...")
+        set_busy(True)
         page.run_task(SCANNERS[eng])
 
     async def run_gemini():
