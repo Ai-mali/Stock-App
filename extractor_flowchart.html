@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: "Segoe UI", sans-serif; background:#F6F7F8; margin:0; padding:28px; }
+  h1 { font-size:18px; color:#1C2024; margin:0 0 4px; }
+  .sub { color:#5B6470; font-size:12.5px; margin-bottom:20px; }
+  .col { display:flex; flex-direction:column; align-items:center; }
+  .node { background:#fff; border:1.5px solid #DFE3E7; border-radius:10px;
+    padding:10px 16px; font-size:13px; color:#1C2024; text-align:center;
+    width:380px; position:relative; }
+  .node b { font-weight:600; }
+  .lbl { position:absolute; left:-52px; top:50%; transform:translateY(-50%);
+    background:#0F8A70; color:#fff; font-weight:700; border-radius:50%;
+    width:30px; height:30px; display:grid; place-items:center; font-size:14px; }
+  .lbl.gray { background:#8A8F94; }
+  .arrow { width:2px; height:26px; background:#9AA3AC; position:relative; }
+  .arrow::after { content:""; position:absolute; bottom:0; left:-4px;
+    border:5px solid transparent; border-top-color:#9AA3AC; }
+  .group { border:1.5px dashed #B9BEC5; border-radius:14px; padding:22px 26px;
+    margin-top:8px; }
+  .gtitle { font-size:11px; font-weight:800; color:#0F8A70; letter-spacing:.06em;
+    text-transform:uppercase; margin-bottom:12px; text-align:center; }
+  .tag { display:inline-block; background:#E1F5EE; color:#17635C; font-size:10.5px;
+    font-weight:700; border-radius:5px; padding:2px 6px; margin-top:5px; }
+  .pending { background:#FFF7ED; border-color:#F0B269; }
+  .pending .lbl { background:#D97706; }
+  .row2 { display:flex; gap:14px; }
+  .row2 .node { width:180px; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>Model &amp; Serial Extractor — Current Flow</h1>
+<div class="sub">Letters A–J mark extension points for the Stock Tracker merge (Stock Tracker screens stay numbered 1–5).</div>
+
+<div class="col">
+  <div class="node">App start — loads saved providers / API keys / chosen model
+    <div class="lbl gray">A</div></div>
+  <div class="arrow"></div>
+  <div class="node"><b>Scan Model</b> button → Model &amp; API Configuration dialog
+    (Provider · Model · key table with remarks)<div class="lbl">B</div></div>
+  <div class="arrow"></div>
+  <div class="node"><b>Load Image</b> → preview (click = Telegram-style viewer window)<div class="lbl">C</div></div>
+  <div class="arrow"></div>
+  <div class="node"><b>SCAN</b> — locked until image loaded; shows SCANNING + log line;
+    fails over across saved keys<div class="lbl">D</div></div>
+  <div class="arrow"></div>
+  <div class="node">AI vision call → JSON → smart parse:<br>
+    dash-range vs separate serials decided by Qty match; flags:
+    qty_mismatch / qty_fixed / no_model<div class="lbl">E</div></div>
+  <div class="arrow"></div>
+
+  <div class="group">
+    <div class="gtitle">Scan Results table — shared manual + scan entry</div>
+    <div class="node">Batch fields: <b>SUPPLIER</b> + <b>DATE IN</b> (one pair per batch)<div class="lbl">F</div></div>
+    <div class="arrow"></div>
+    <div class="row2">
+      <div class="node"><b>+</b> add row manually<br>(No / Model / Serial / Qty)</div>
+      <div class="node"><b>pencil</b> edit row<br>re-validates flag</div>
+      <div class="node"><b>send arrow</b> → Stock In<br><span style="color:#8A8F94">grey if no Model+Serial</span></div>
+      <div class="node"><b>download</b><br>export CSV</div>
+    </div>
+    <div class="arrow"></div>
+    <div class="node pending">send_row() — validates Supplier/Model/Serial, then calls
+      <b>stock_store.stock_in()</b> (shared save: duplicate check + new-Type modal + Excel)
+      <div class="tag">NOT WIRED YET — waits for Stock Tracker merge</div><div class="lbl">G</div></div>
+  </div>
+
+  <div class="arrow"></div>
+  <div class="node pending">Serial-less parts rows (joints / kits / ventilator) — currently not sendable
+    <div class="tag">PARKED — decide at merge time</div><div class="lbl">H</div></div>
+  <div class="arrow"></div>
+  <div class="node"><b>Clear</b> — resets image, rows, added marks, log</div>
+</div>
+</body>
+</html>
