@@ -20,6 +20,10 @@ import flet as ft
 
 CONFIG_PATH = Path.home() / ".model_serial_extractor.json"
 
+# Set once the Stock Tracker is merged in — the real Stock In save function
+# (duplicate check + new-Type modal + Excel write) will be wired here.
+stock_store = None
+
 # Supported scan providers. Each holds its own key list and picked model.
 PROVIDERS = {
     "gemini": {
@@ -250,6 +254,7 @@ def main(page: ft.Page):
         "image_path": None,
         "busy": False,
         "rows": [],
+        "added": set(),  # row indexes already sent to Stock In
     }
 
     # ------------------------------------------------------------- widgets
@@ -393,10 +398,30 @@ def main(page: ft.Page):
         visible=False,
     )
 
+    # ---- batch-level Stock In details: one Supplier + one Date In shared
+    # by every scanned row, same rule as the manual Stock In form.
+    supplier_field = ft.TextField(
+        label="SUPPLIER", hint_text="e.g. Daikin distributor", dense=True,
+        expand=3)
+    date_in_field = ft.TextField(
+        label="DATE IN", hint_text="mm/dd/yyyy",
+        value=datetime.date.today().strftime("%m/%d/%Y"),
+        dense=True, read_only=True, expand=2)
+    date_picker = ft.DatePicker(value=datetime.date.today())
+    page.overlay.append(date_picker)
+
+    def _on_date_picked(e):
+        if date_picker.value:
+            d = date_picker.value
+            date_in_field.value = f"{d.month:02d}/{d.day:02d}/{d.year}"
+            date_in_field.update()
+
+    date_picker.on_change = _on_date_picked
+
     # Custom table: proportional columns (flex weights) so the grid stays
     # evenly spaced at any window size, with a frozen header and scrolling body.
     FLEX = {"no": 1, "model": 3, "serial": 6, "qty": 2}
-    EDIT_W = 44
+    EDIT_W = 76  # pencil + send arrow
 
     def _head(text, flex=None, center=True):
         return ft.Container(
@@ -467,6 +492,8 @@ def main(page: ft.Page):
         result_rows = []
         for i, r in enumerate(rows):
             flagged = bool(r.get("flag"))
+            added = i in state["added"]
+            sendable = bool(r["model"] and r["serial"])
             result_rows.append(ft.Container(
                 ft.Row([
                     cell(r["no"], FLEX["no"], color=INK_SOFT,
@@ -488,15 +515,34 @@ def main(page: ft.Page):
                          color=INK if r["serial"] else INK_SOFT),
                     cell(qty_text(r.get("qty", "")), FLEX["qty"], no_wrap=True),
                     ft.Container(
-                        ft.IconButton(ft.Icons.EDIT_OUTLINED, icon_size=16,
-                                      tooltip="Edit row", icon_color=INK_SOFT,
-                                      on_click=lambda e, i=i: open_edit(i)),
+                        ft.Row([
+                            ft.IconButton(ft.Icons.EDIT_OUTLINED, icon_size=16,
+                                          tooltip="Edit row",
+                                          icon_color=INK_SOFT,
+                                          on_click=lambda e, i=i: open_edit(i)),
+                            ft.Icon(ft.Icons.CHECK_CIRCLE, size=18,
+                                    color=TEAL, tooltip="Added to stock")
+                            if added else
+                            ft.IconButton(ft.Icons.SEND, icon_size=16,
+                                          tooltip="Add this row to Stock In"
+                                          if sendable else
+                                          "Needs a Model and at least one "
+                                          "Serial before it can be added",
+                                          icon_color=TEAL if sendable
+                                          else "#B9BEC5",
+                                          disabled=not sendable,
+                                          on_click=(
+                                              lambda e, i=i: send_row(i))),
+                        ], spacing=0, tight=True,
+                            alignment=ft.MainAxisAlignment.CENTER),
                         width=EDIT_W, alignment=ft.Alignment(0, 0),
                     ),
                 ], spacing=0),
-                bgcolor="#FDECEA" if flagged else
+                bgcolor="#E6F4EC" if added else
+                        "#FDECEA" if flagged else
                         ("#FFFFFF" if i % 2 == 0 else "#FAFBFC"),
                 border=ft.Border.only(bottom=ft.BorderSide(1, "#EEF1F3")),
+                opacity=0.6 if added else 1.0,
             ))
         results_body.controls = result_rows
         serial_count = sum(len([s for s in r["serial"].split(",") if s.strip()])
@@ -1116,6 +1162,7 @@ def main(page: ft.Page):
 
     def do_clear(e):
         state["image_path"] = None
+        state["added"] = set()
         img_preview.visible = False
         img_preview.src = ""
         img_empty.visible = True
@@ -1124,6 +1171,34 @@ def main(page: ft.Page):
         badge.visible = False
         log_list.controls.clear()
         log("Cleared. Waiting for image payload...")
+
+    def send_row(i: int):
+        """Send one scanned row to Stock In — same validation + save path
+        as manual entry (duplicate check + new-Type modal)."""
+        r = state["rows"][i]
+        supplier = supplier_field.value.strip()
+        if not supplier:
+            log("Fill in SUPPLIER before adding a row to stock.")
+            return
+        if not r["model"] or not r["serial"]:
+            log("This row needs a Model and Serial before it can be added.")
+            return
+        date_in = date_in_field.value.strip()
+        log(f"Adding No {r['no'] or i + 1} — {r['model']} "
+            f"({_serial_count(r['serial'])} serial(s)) · "
+            f"{supplier} · {date_in}")
+        if stock_store is None:
+            log("⚠ Stock Tracker not connected yet — nothing was saved. "
+                "The row-send button is wired and waiting for the merge.")
+            return
+        ok, dupes = stock_store.stock_in(
+            supplier=supplier, model=r["model"],
+            serials=r["serial"].split(","), date_in=date_in)
+        if ok:
+            state["added"].add(i)
+            set_results(state["rows"])
+        if dupes:
+            log(f"DUPLICATED SERIAL NUMBER: {', '.join(dupes).upper()}")
 
     # ------------------------------------------------------------- row edit dialog
     edit_no = ft.TextField(label="No", dense=True)
@@ -1256,6 +1331,15 @@ def main(page: ft.Page):
                      badge,
                      ft.IconButton(ft.Icons.DOWNLOAD, icon_size=18,
                                    tooltip="Export CSV", on_click=export_csv)],
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [supplier_field, date_in_field,
+                     ft.IconButton(ft.Icons.CALENDAR_MONTH, icon_size=18,
+                                   tooltip="Pick Date In",
+                                   on_click=lambda e: page.show_dialog(
+                                       date_picker))],
+                    spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 results_scroll,
