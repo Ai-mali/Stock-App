@@ -1474,8 +1474,132 @@ def main(page: ft.Page):
         expand=True,
     )
 
+    # ------------------------------------------------- 3 Available Stock
+    # Type ribbon (counts) -> Model panel -> serial chips, accordion at
+    # both levels, read live from the Excel store.
+    avail_open = {"type": None, "model": None}
+    avail_ribbon = ft.Row(wrap=True, spacing=8, run_spacing=8)
+    avail_panel = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
+
+    def _in_stock_tree() -> dict:
+        tree: dict[str, dict[str, list]] = {}
+        if stock_store is None:
+            return tree
+        for r in stock_store.records:
+            if str(r.get("Status", "")).strip() != "In Stock":
+                continue
+            tree.setdefault(r["Type"], {}).setdefault(r["Model"], []).append(r)
+        return tree
+
+    def _avail_oval(name: str, count: int, active: bool):
+        return ft.Container(
+            ft.Text(f"{name} ({count})", size=12.5,
+                    weight=ft.FontWeight.W_600,
+                    color="white" if active else INK),
+            bgcolor=TEAL if active else "#EDF0F2",
+            border_radius=99, padding=ft.Padding(14, 7, 14, 7),
+            on_click=lambda e, n=name: toggle_avail_type(n),
+        )
+
+    def toggle_avail_type(name: str):
+        # accordion: opening a Type closes the previous one and its Model
+        if avail_open["type"] == name:
+            avail_open.update(type=None, model=None)
+        else:
+            avail_open.update(type=name, model=None)
+        render_available()
+
+    def toggle_avail_model(model: str):
+        avail_open["model"] = None if avail_open["model"] == model else model
+        render_available()
+
+    def render_available():
+        tree = _in_stock_tree()
+        types = sorted(tree)
+        avail_ribbon.controls = [
+            _avail_oval(t, sum(len(v) for v in tree[t].values()),
+                        t == avail_open["type"])
+            for t in types
+        ]
+        avail_panel.controls = []
+        if not types:
+            avail_panel.controls.append(
+                ft.Text("No units currently in stock.", color=INK_SOFT,
+                        size=13))
+        active = avail_open["type"]
+        if active and active in tree:
+            groups = [ft.Text(active, size=13, weight=ft.FontWeight.W_700,
+                              color=TEAL)]
+            for m in sorted(tree[active]):
+                units = tree[active][m]
+                is_open = avail_open["model"] == m
+                groups.append(ft.Container(
+                    ft.Column([
+                        ft.Container(
+                            ft.Row([
+                                ft.Text(m, size=13,
+                                        weight=ft.FontWeight.W_600),
+                                ft.Container(expand=True),
+                                ft.Text(f"{len(units)} in stock", size=12,
+                                        color=INK_SOFT),
+                                ft.Icon(ft.Icons.EXPAND_LESS if is_open
+                                        else ft.Icons.EXPAND_MORE,
+                                        size=18, color=INK_SOFT),
+                            ]),
+                            padding=ft.Padding(12, 10, 12, 10),
+                            on_click=lambda e, m=m: toggle_avail_model(m),
+                        ),
+                        ft.Container(
+                            ft.Row([_serial_chip(u) for u in units],
+                                   wrap=True, spacing=8, run_spacing=8),
+                            padding=ft.Padding(12, 0, 12, 12),
+                            visible=is_open,
+                        ),
+                    ], spacing=0),
+                    bgcolor=CARD, border_radius=8,
+                    border=ft.Border.all(1, LINE),
+                ))
+            avail_panel.controls.append(
+                ft.Container(ft.Column(groups, spacing=8),
+                             bgcolor="#F9FBFA", border_radius=10,
+                             padding=12,
+                             border=ft.Border.only(
+                                 top=ft.BorderSide(3, TEAL))))
+        page.update()
+
+    def _serial_chip(unit: dict):
+        return ft.Container(
+            ft.Column([
+                ft.Text(str(unit["Serial"]).upper(), size=12.5,
+                        weight=ft.FontWeight.W_600),
+                ft.Text(f"In: {unit['Date In']}", size=10.5, color=INK_SOFT),
+            ], spacing=1, tight=True),
+            bgcolor="#F4F6F7", border_radius=6,
+            border=ft.Border.all(1, LINE),
+            padding=ft.Padding(10, 6, 10, 6),
+        )
+
+    available_view = ft.Column(
+        [card(ft.Column([
+            ft.Row([ft.Text("Available Stock", size=15,
+                            weight=ft.FontWeight.W_600),
+                    ft.Container(expand=True),
+                    ft.IconButton(ft.Icons.REFRESH, icon_size=18,
+                                  tooltip="Reload from Excel",
+                                  on_click=lambda e: reload_stock())]),
+            avail_ribbon,
+            avail_panel,
+        ], spacing=12, expand=True), expand=True)],
+        expand=True, visible=False,
+    )
+
+    def reload_stock():
+        if stock_store is not None:
+            stock_store.load()
+        render_available()
+
     # ---- Stock Tracker nav: the extractor IS screen 1 (Stock In);
-    # screens 3/4/5 are ported one at a time into these tabs.
+    # screens 4/5 are ported one at a time into these tabs.
     TABS = ["1  Stock In", "3  Available Stock", "4  Stock Out",
             "5  Track List"]
     nav_btns = {}
@@ -1491,11 +1615,13 @@ def main(page: ft.Page):
     )
 
     def switch_tab(name):
-        is_in = name == TABS[0]
-        stock_in_row.visible = is_in
-        placeholder.visible = not is_in
-        if not is_in:
+        stock_in_row.visible = name == TABS[0]
+        available_view.visible = name == TABS[1]
+        placeholder.visible = name in TABS[2:]
+        if placeholder.visible:
             placeholder_text.value = f"{name.strip()} — coming next"
+        if available_view.visible:
+            reload_stock()
         for n, b in nav_btns.items():
             active = n == name
             b.bgcolor = TEAL if active else "#EDF0F2"
@@ -1516,7 +1642,8 @@ def main(page: ft.Page):
                     [
                         header,
                         nav_bar,
-                        ft.Stack([stock_in_row, placeholder], expand=True),
+                        ft.Stack([stock_in_row, available_view, placeholder],
+                                 expand=True),
                     ],
                     expand=True,
                 ),
