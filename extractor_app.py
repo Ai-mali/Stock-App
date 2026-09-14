@@ -150,7 +150,15 @@ def load_providers() -> dict:
     if old:
         out["gemini"]["keys"].append(old)
     for p in out:
-        out[p]["keys"] = list(dict.fromkeys(out[p]["keys"]))
+        # keys are {"key": str, "remark": str} dicts; migrate plain strings
+        seen = []
+        for k in out[p]["keys"]:
+            seen.append(k if isinstance(k, dict) else {"key": k, "remark": ""})
+        dedup = {}
+        for entry in seen:
+            if entry.get("key"):
+                dedup[entry["key"]] = entry
+        out[p]["keys"] = list(dedup.values())
     return out
 
 
@@ -431,29 +439,18 @@ def main(page: ft.Page):
         return serial_count
 
     # ------------------------------------------------------------- Scan Model
-    # One button opens a manager window: provider list on top, each provider
-    # has its own model dropdown + multi-key list. The button label collapses
-    # to the chosen provider/model afterwards.
-    engine_btn = ft.Button("Scan Model", icon=ft.Icons.MEMORY,
-                           bgcolor=ENGINE_GRAY, color=INK, elevation=0)
+    # Figma design: header button opens "Model & API Configuration" —
+    # engine router (provider + model), credentials table with remarks,
+    # add-key panel, and a Cancel / Apply footer.
+    engine_btn = ft.Button("Scan Model", bgcolor=ENGINE_GRAY, color=INK,
+                           elevation=0)
 
     def engine_caption() -> str:
         eng = state["engine"]
         if not eng:
             return "Scan Model"
-        p = PROVIDERS[eng]
-        return f"Scan Model ({p['label']} · {state['providers'][eng]['model']})"
-
-    # ------------------------------------------------------------- engine manager
-    # One window listing all providers; each has a model dropdown and its own
-    # multi-key list. Selecting a provider (with at least one key) sets it as
-    # the active engine and the header button collapses to show the choice.
-    key_field = ft.TextField(password=True, can_reveal_password=True,
-                             label="API key", hint_text="Paste a new API key",
-                             dense=True)
-    keys_list = ft.Column(spacing=4)
-    model_dd = ft.Dropdown(label="Model", dense=True, expand=True)
-    provider_row = ft.Row(spacing=6)
+        return (f"Scan Model ({PROVIDERS[eng]['label']} · "
+                f"{state['providers'][eng]['model']})")
 
     def _mask(k: str) -> str:
         return k[:6] + "..." + k[-4:] if len(k) > 12 else "****"
@@ -462,121 +459,238 @@ def main(page: ft.Page):
         return state["providers"][state["key_engine"]]
 
     def refresh_engine_btn():
-        engine_btn.content = ft.Row(
-            [ft.Icon(ft.Icons.MEMORY, size=16, color=INK),
-             ft.Text(engine_caption(), color=INK, size=13,
-                     weight=ft.FontWeight.W_500, no_wrap=True)],
-            spacing=6, tight=True)
-        page.update()
+        engine_btn.content = ft.Text(engine_caption(), color=INK, size=13,
+                                     weight=ft.FontWeight.W_500, no_wrap=True)
+        try:
+            engine_btn.update()
+        except RuntimeError:
+            pass
 
-    def refresh_provider_panel():
+    # ---- engine router (01)
+    provider_dd = ft.Dropdown(label="AI Provider", dense=True, expand=True)
+    model_dd = ft.Dropdown(label="Model Selection", dense=True, expand=True)
+
+    # ---- credentials table (02)
+    keys_table = ft.Column(spacing=0)
+    keys_count = ft.Text("0 keys registered", size=11, color=INK_SOFT)
+    new_key_field = ft.TextField(hint_text="Paste a new API key",
+                                 password=True, can_reveal_password=True,
+                                 dense=True, expand=3)
+    new_remark_field = ft.TextField(hint_text="e.g. Rachel (Field Tech)",
+                                    dense=True, expand=2)
+    footer_status = ft.Text("", size=12, color=INK_SOFT)
+    revealed = set()  # indexes whose key is shown in full
+
+    def _section_title(txt):
+        return ft.Text(txt, size=11, weight=ft.FontWeight.W_800, color=TEAL)
+
+    def _key_row(i: int, entry: dict):
+        shown = i in revealed
+        return ft.Container(
+            ft.Row([
+                ft.Container(ft.Text(PROVIDERS[state["key_engine"]]["label"],
+                                     size=10, weight=ft.FontWeight.W_700,
+                                     color="#17635C", no_wrap=True),
+                             bgcolor="#EEFAF7", border_radius=6,
+                             padding=ft.Padding(6, 4, 6, 4), width=110),
+                ft.Text(entry["key"] if shown else _mask(entry["key"]),
+                        size=11, font_family="Consolas", color="#58647A",
+                        width=130, no_wrap=True, expand=True),
+                ft.Container(ft.Text("ACTIVE", size=9,
+                                     weight=ft.FontWeight.W_800,
+                                     color="#087F5B"),
+                             bgcolor="#D9FBE9", border_radius=99,
+                             padding=ft.Padding(7, 4, 7, 4), width=62,
+                             alignment=ft.Alignment(0, 0)),
+                ft.TextField(value=entry.get("remark", ""),
+                             hint_text="Owner / Remark", dense=True,
+                             text_size=12, width=150,
+                             on_change=lambda e, i=i: save_remark(i, e)),
+                ft.Row([
+                    ft.IconButton(
+                        ft.Icons.VISIBILITY_OFF if shown
+                        else ft.Icons.VISIBILITY,
+                        icon_size=15, tooltip="Reveal / hide key",
+                        on_click=lambda e, i=i: toggle_reveal(i)),
+                    ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_size=15,
+                                  icon_color="#EF4444", tooltip="Delete key",
+                                  on_click=lambda e, i=i: remove_key(i)),
+                ], spacing=2),
+            ], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.Padding(8, 6, 8, 6),
+            border=ft.Border.only(bottom=ft.BorderSide(1, "#EDF0F5")),
+            bgcolor="#FFFFFF" if i % 2 == 0 else "#F9FAFB",
+        )
+
+    def save_remark(i: int, e):
+        _cfg()["keys"][i]["remark"] = e.control.value
+        save_providers(state["providers"])
+
+    def toggle_reveal(i: int):
+        if i in revealed:
+            revealed.discard(i)
+        else:
+            revealed.add(i)
+        refresh_key_table()
+
+    def refresh_key_table():
+        keys = _cfg()["keys"]
+        n = len(keys)
+        keys_count.value = f"{n} key{'s' if n != 1 else ''} registered"
+        head = ft.Container(
+            ft.Row([
+                ft.Text("PROVIDER", size=9, weight=ft.FontWeight.W_800,
+                        color="#738096", width=110),
+                ft.Text("KEY SIGNATURE", size=9, weight=ft.FontWeight.W_800,
+                        color="#738096", expand=True),
+                ft.Text("STATUS", size=9, weight=ft.FontWeight.W_800,
+                        color="#738096", width=62),
+                ft.Text("OWNER / REMARK", size=9, weight=ft.FontWeight.W_800,
+                        color="#738096", width=150),
+                ft.Text("ACTIONS", size=9, weight=ft.FontWeight.W_800,
+                        color="#738096", width=80),
+            ], spacing=8),
+            padding=ft.Padding(8, 6, 8, 6), bgcolor="#F7F9FC",
+            border=ft.Border.only(bottom=ft.BorderSide(1, "#EDF0F5")),
+        )
+        keys_table.controls = [head] + [_key_row(i, k)
+                                        for i, k in enumerate(keys)]
+        try:
+            keys_count.update()
+            keys_table.update()
+        except RuntimeError:
+            pass  # controls not mounted yet — they'll render on dialog open
+
+    def refresh_router():
         eng = state["key_engine"]
-        provider_row.controls = [
-            ft.Button(
-                PROVIDERS[p]["label"], expand=True,
-                bgcolor=(TEAL if p == eng else ENGINE_GRAY),
-                color=("white" if p == eng else INK), elevation=0,
-                style=ft.ButtonStyle(padding=ft.Padding(4, 8, 4, 8),
-                                     text_style=ft.TextStyle(size=12)),
-                on_click=lambda e, p=p: pick_engine(p))
-            for p in PROVIDERS
-        ]
+        provider_dd.value = eng
         model_dd.options = [ft.dropdown.Option(m)
                             for m in PROVIDERS[eng]["models"]]
         model_dd.value = _cfg()["model"]
-        key_field.label = f"{PROVIDERS[eng]['label']} API key"
-        keys_list.controls = [
-            ft.Row([
-                ft.Icon(ft.Icons.KEY, size=14, color=TEAL),
-                ft.Text(f"Key {i+1}: {_mask(k)}", size=12,
-                        font_family="Consolas", expand=True),
-                ft.IconButton(ft.Icons.CLOSE, icon_size=14, tooltip="Remove key",
-                              icon_color=INK_SOFT,
-                              on_click=lambda e, i=i: remove_key(i)),
-            ], spacing=6)
-            for i, k in enumerate(_cfg()["keys"])
-        ]
-        page.update()
+        new_key_field.hint_text = f"Enter {PROVIDERS[eng]['label']} API key"
+        refresh_key_table()
+        footer_status.value = (f"Local routing active on "
+                               f"{PROVIDERS[eng]['label']} · "
+                               f"{_cfg()['model']}"
+                               if _cfg()["keys"] else
+                               f"{PROVIDERS[eng]['label']}: no key saved yet")
 
-    def pick_engine(engine: str):
-        """Provider selected in the manager — confirm it if keys exist."""
-        state["key_engine"] = engine
-        if _cfg()["keys"]:
-            state["engine"] = engine
-        refresh_provider_panel()
-        refresh_engine_btn()
+    def on_provider_change(e):
+        state["key_engine"] = provider_dd.value
+        revealed.clear()
+        refresh_router()
 
     def on_model_change(e):
         _cfg()["model"] = model_dd.value
         save_providers(state["providers"])
+        refresh_router()
         refresh_engine_btn()
 
+    provider_dd.options = [ft.dropdown.Option(k, PROVIDERS[k]["label"])
+                           for k in PROVIDERS]
+    provider_dd.on_select = on_provider_change
     model_dd.on_select = on_model_change
 
     def remove_key(i: int):
         _cfg()["keys"].pop(i)
+        revealed.clear()
         save_providers(state["providers"])
-        refresh_provider_panel()
+        refresh_router()
         if not _cfg()["keys"] and state["engine"] == state["key_engine"]:
             state["engine"] = None
-            refresh_engine_btn()
-        log(f"Key {i+1} removed.")
+        refresh_engine_btn()
+        log(f"Key {i + 1} removed.")
 
-    def add_key(e=None):
-        k = key_field.value.strip()
+    def register_key(e=None):
+        k = new_key_field.value.strip()
         if not k:
             return
-        if k in _cfg()["keys"]:
+        existing = [x["key"] for x in _cfg()["keys"]]
+        if k in existing:
             log("That key is already saved.")
         else:
-            _cfg()["keys"].append(k)
+            _cfg()["keys"].append(
+                {"key": k, "remark": new_remark_field.value.strip()})
             save_providers(state["providers"])
             log(f"{PROVIDERS[state['key_engine']]['label']} key "
                 f"{len(_cfg()['keys'])} added ({_mask(k)}).", ok=True)
-        key_field.value = ""
-        refresh_provider_panel()
-        if _cfg()["keys"]:
-            state["engine"] = state["key_engine"]
-            refresh_engine_btn()
+        new_key_field.value = ""
+        new_remark_field.value = ""
+        refresh_router()
 
-    def close_key_dialog(e=None):
-        # Done also commits any key still sitting in the input field.
-        if key_field.value and key_field.value.strip():
-            add_key()
-        key_dialog.open = False
+    def apply_config(e=None):
+        if new_key_field.value and new_key_field.value.strip():
+            register_key()
         if _cfg()["keys"]:
             state["engine"] = state["key_engine"]
             refresh_engine_btn()
             log(f"Engine: {engine_caption()} ready "
                 f"({len(_cfg()['keys'])} key(s) saved).")
+        key_dialog.open = False
+        page.update()
+
+    def cancel_config(e=None):
+        key_dialog.open = False
         page.update()
 
     key_dialog = ft.AlertDialog(
         modal=True,
-        title=ft.Text("Scan Model", size=15, weight=ft.FontWeight.W_600),
+        title=ft.Row([
+            ft.Column([
+                ft.Text("Model & API Configuration", size=16,
+                        weight=ft.FontWeight.W_700),
+                ft.Text("Configure engine routing and active secure "
+                        "credentials.", size=12, color=INK_SOFT),
+            ], spacing=2, expand=True),
+            ft.IconButton(ft.Icons.CLOSE, icon_color=INK_SOFT,
+                          on_click=cancel_config),
+        ]),
         content=ft.Container(
             ft.Column([
-                provider_row,
-                model_dd,
-                keys_list,
-                ft.Row([key_field,
-                        ft.IconButton(ft.Icons.ADD_CIRCLE_OUTLINE,
-                                      icon_color=TEAL, tooltip="Add key",
-                                      on_click=add_key)], spacing=6),
-                ft.Text("Pick a provider, choose its model, then add key(s). "
-                        "If one key hits its limit, the next is used "
-                        "automatically.", size=11, color=INK_SOFT),
-            ], tight=True, spacing=10),
-            width=460,
+                _section_title("01 / ENGINE ROUTER"),
+                ft.Row([provider_dd, model_dd], spacing=10),
+                ft.Row([_section_title("02 / API KEY CREDENTIALS"),
+                        keys_count],
+                       alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                       vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Container(keys_table, border_radius=10,
+                             border=ft.Border.all(1, "#E2E7EF"),
+                             clip_behavior=ft.ClipBehavior.HARD_EDGE),
+                ft.Container(
+                    ft.Column([
+                        ft.Text("ADD NEW CONFIGURATION KEY", size=10,
+                                weight=ft.FontWeight.W_800),
+                        ft.Row([
+                            new_key_field, new_remark_field,
+                            ft.Button("Register", icon=ft.Icons.ADD,
+                                      bgcolor=TEAL, color="white",
+                                      on_click=register_key),
+                        ], spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ], spacing=8),
+                    bgcolor="#F7F9FC", border_radius=10,
+                    padding=ft.Padding(12, 10, 12, 12),
+                    border=ft.Border.all(1, "#E5E9F0")),
+            ], tight=True, spacing=10, scroll=ft.ScrollMode.AUTO),
+            width=620, height=480,
         ),
         actions=[
-            ft.FilledButton("Done", on_click=close_key_dialog),
+            footer_status,
+            ft.Button("Cancel", on_click=cancel_config,
+                      style=ft.ButtonStyle(
+                          side=ft.BorderSide(1, "#DCE2EA"),
+                          bgcolor="#FFFFFF", color=INK)),
+            ft.FilledButton("Apply Configuration", icon=ft.Icons.CHECK,
+                            bgcolor=TEAL, color="white",
+                            on_click=apply_config),
         ],
+        actions_alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
     )
 
     def open_key_manager(e=None):
         state["key_engine"] = state["engine"] or "gemini"
-        refresh_provider_panel()
+        revealed.clear()
+        refresh_router()
         key_dialog.open = True
         page.show_dialog(key_dialog)
         page.update()
@@ -708,7 +822,8 @@ def main(page: ft.Page):
             resp = None
             last_err = None
             keys = state["providers"]["gemini"]["keys"]
-            for ki, key in enumerate(keys):
+            for ki, entry in enumerate(keys):
+                key = entry["key"]
                 if len(keys) > 1:
                     log(f"Using Gemini key {ki + 1} of {len(keys)}...")
                 client = genai.Client(api_key=key)
@@ -789,7 +904,8 @@ def main(page: ft.Page):
             text = None
             last_err = None
             keys = cfg["keys"]
-            for ki, key in enumerate(keys):
+            for ki, entry in enumerate(keys):
+                key = entry["key"]
                 if len(keys) > 1:
                     log(f"Using {label} key {ki + 1} of {len(keys)}...")
                 for attempt in range(3):
@@ -859,7 +975,8 @@ def main(page: ft.Page):
             text = None
             last_err = None
             keys = cfg["keys"]
-            for ki, key in enumerate(keys):
+            for ki, entry in enumerate(keys):
+                key = entry["key"]
                 if len(keys) > 1:
                     log(f"Using Claude key {ki + 1} of {len(keys)}...")
                 for attempt in range(3):
