@@ -1598,8 +1598,292 @@ def main(page: ft.Page):
             stock_store.load()
         render_available()
 
+    # ------------------------------------------------------ 4 Stock Out
+    # Same Type->Model accordion, but chips are selectable; selections go
+    # to a cart, then one Customer + Date Out is applied at checkout.
+    out_state = {"type": None, "model": None, "selected": set(), "cart": []}
+    out_search = ft.TextField(hint_text="Search Type, Model, Serial or Date In",
+                              dense=True, expand=True,
+                              prefix_icon=ft.Icons.SEARCH,
+                              on_change=lambda e: render_out())
+    out_ribbon = ft.Row(wrap=True, spacing=8, run_spacing=8)
+    out_panel = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO)
+    cart_list = ft.Column(spacing=6)
+    cart_title = ft.Text("Cart (0)", size=14, weight=ft.FontWeight.W_600)
+    add_cart_btn = ft.Button("Add to cart (0)", bgcolor=TEAL, color="white",
+                             elevation=0,
+                             on_click=lambda e: add_selected_to_cart())
+    out_customer = ft.TextField(label="CUSTOMER NAME", dense=True, expand=3)
+    out_date = ft.TextField(label="DATE OUT", dense=True, read_only=True,
+                            expand=2,
+                            value=datetime.date.today().strftime("%m/%d/%Y"))
+    out_picker = ft.DatePicker(value=datetime.date.today())
+    page.overlay.append(out_picker)
+
+    def _on_out_date(e):
+        if out_picker.value:
+            d = out_picker.value
+            out_date.value = f"{d.month:02d}/{d.day:02d}/{d.year}"
+            out_date.update()
+
+    out_picker.on_change = _on_out_date
+    out_msg = ft.Text("", size=12.5)
+
+    def _out_tree() -> dict:
+        q = out_search.value.strip().lower() if out_search.value else ""
+        tree: dict[str, dict[str, list]] = {}
+        if stock_store is None:
+            return tree
+        carted = {s.lower() for s in out_state["cart"]}
+        for r in stock_store.records:
+            if str(r.get("Status", "")).strip() != "In Stock":
+                continue
+            if str(r["Serial"]).lower() in carted:
+                continue
+            if q and q not in " ".join(
+                    str(r[c]).lower() for c in
+                    ("Type", "Model", "Serial", "Date In")):
+                continue
+            tree.setdefault(r["Type"], {}).setdefault(r["Model"], []).append(r)
+        return tree
+
+    def toggle_out_type(name: str):
+        # leaving a Type with uncarted selections inside asks first
+        if out_state["type"] == name:
+            _attempt_leave_type(None)
+        elif out_state["type"] is None:
+            out_state.update(type=name, model=None)
+            render_out()
+        else:
+            _attempt_leave_type(name)
+
+    def _selected_in_type(type_name: str) -> list:
+        if stock_store is None:
+            return []
+        return [r for r in stock_store.records
+                if str(r["Serial"]) in out_state["selected"]
+                and r["Type"] == type_name]
+
+    def _attempt_leave_type(next_type):
+        current = out_state["type"]
+        held = _selected_in_type(current) if current else []
+        if held:
+            pending_leave["next"] = next_type
+            pending_leave["type"] = current
+            leave_text.value = (f"You Selected {len(held)} Items in "
+                                f"{current}")
+            leave_dialog.open = True
+            page.update()
+            return
+        out_state.update(type=next_type, model=None)
+        render_out()
+
+    pending_leave = {"type": None, "next": None}
+    leave_text = ft.Text("", size=13)
+    leave_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("Unsaved selection", size=15,
+                      weight=ft.FontWeight.W_600),
+        content=ft.Container(leave_text, width=340),
+        actions=[
+            ft.TextButton("Cancel", on_click=lambda e: _close_leave(False)),
+            ft.FilledButton("Unselect & Collapse",
+                            on_click=lambda e: _close_leave(True)),
+        ],
+    )
+    page.overlay.append(leave_dialog)
+
+    def _close_leave(confirm: bool):
+        leave_dialog.open = False
+        if confirm:
+            for r in _selected_in_type(pending_leave["type"]):
+                out_state["selected"].discard(str(r["Serial"]))
+            out_state.update(type=pending_leave["next"], model=None)
+        pending_leave.update(type=None, next=None)
+        render_out()
+
+    def toggle_out_model(model: str):
+        # switching Model inside a Type never asks — selections persist
+        out_state["model"] = None if out_state["model"] == model else model
+        render_out()
+
+    def toggle_select(serial: str):
+        s = str(serial)
+        sel = out_state["selected"]
+        sel.discard(s) if s in sel else sel.add(s)
+        render_out()
+
+    def add_selected_to_cart():
+        if not out_state["selected"]:
+            return
+        out_state["cart"].extend(sorted(out_state["selected"]))
+        out_state["selected"].clear()
+        render_out()
+
+    def remove_from_cart(serial: str):
+        out_state["cart"] = [s for s in out_state["cart"] if s != serial]
+        render_out()
+
+    def _out_chip(unit: dict):
+        s = str(unit["Serial"])
+        picked = s in out_state["selected"]
+        return ft.Container(
+            ft.Column([
+                ft.Text(s.upper(), size=12.5, weight=ft.FontWeight.W_600,
+                        color="white" if picked else INK),
+                ft.Text(f"In: {unit['Date In']}", size=10.5,
+                        color="#D7E9E4" if picked else INK_SOFT),
+            ], spacing=1, tight=True),
+            bgcolor="#1E6FD9" if picked else "#F4F6F7",
+            border_radius=6,
+            border=ft.Border.all(1, "#1E6FD9" if picked else LINE),
+            padding=ft.Padding(10, 6, 10, 6),
+            on_click=lambda e, s=s: toggle_select(s),
+        )
+
+    def render_out():
+        tree = _out_tree()
+        types = sorted(tree)
+        out_ribbon.controls = [
+            ft.Container(
+                ft.Text(f"{t} ({sum(len(v) for v in tree[t].values())})",
+                        size=12.5, weight=ft.FontWeight.W_600,
+                        color="white" if t == out_state["type"] else INK),
+                bgcolor=TEAL if t == out_state["type"] else "#EDF0F2",
+                border_radius=99, padding=ft.Padding(14, 7, 14, 7),
+                on_click=lambda e, t=t: toggle_out_type(t),
+            ) for t in types
+        ]
+        out_panel.controls = []
+        if not types:
+            out_panel.controls.append(
+                ft.Text("No in-stock units match.", color=INK_SOFT, size=13))
+        active = out_state["type"]
+        if active in tree:
+            groups = [ft.Text(active, size=13, weight=ft.FontWeight.W_700,
+                              color=TEAL)]
+            for m in sorted(tree[active]):
+                units = tree[active][m]
+                is_open = out_state["model"] == m
+                groups.append(ft.Container(
+                    ft.Column([
+                        ft.Container(
+                            ft.Row([
+                                ft.Text(m, size=13,
+                                        weight=ft.FontWeight.W_600),
+                                ft.Container(expand=True),
+                                ft.Text(f"{len(units)} in stock", size=12,
+                                        color=INK_SOFT),
+                                ft.Icon(ft.Icons.EXPAND_LESS if is_open
+                                        else ft.Icons.EXPAND_MORE,
+                                        size=18, color=INK_SOFT),
+                            ]),
+                            padding=ft.Padding(12, 10, 12, 10),
+                            on_click=lambda e, m=m: toggle_out_model(m),
+                        ),
+                        ft.Container(
+                            ft.Row([_out_chip(u) for u in units], wrap=True,
+                                   spacing=8, run_spacing=8),
+                            padding=ft.Padding(12, 0, 12, 12),
+                            visible=is_open,
+                        ),
+                    ], spacing=0),
+                    bgcolor=CARD, border_radius=8,
+                    border=ft.Border.all(1, LINE),
+                ))
+            out_panel.controls.append(
+                ft.Container(ft.Column(groups, spacing=8), bgcolor="#F9FBFA",
+                             border_radius=10, padding=12,
+                             border=ft.Border.only(
+                                 top=ft.BorderSide(3, TEAL))))
+
+        add_cart_btn.content = ft.Text(
+            f"Add to cart ({len(out_state['selected'])})", size=13,
+            weight=ft.FontWeight.W_600, color="white")
+        add_cart_btn.disabled = not out_state["selected"]
+        add_cart_btn.bgcolor = TEAL if out_state["selected"] else "#D9DEE2"
+        _render_cart()
+        page.update()
+
+    def _render_cart():
+        cart = out_state["cart"]
+        cart_title.value = f"Cart ({len(cart)})"
+        if not cart:
+            cart_list.controls = [ft.Text("No items added yet.",
+                                          color=INK_SOFT, size=12.5)]
+            return
+        by_model: dict[str, list[str]] = {}
+        for s in cart:
+            rec = next((r for r in stock_store.records
+                        if str(r["Serial"]) == s), None)
+            by_model.setdefault(rec["Model"] if rec else "?", []).append(s)
+        rows = []
+        for m, serials in by_model.items():
+            line = [ft.Container(ft.Text(m, size=12.5,
+                                         weight=ft.FontWeight.W_600),
+                                 width=120),
+                    ft.Text(f"({len(serials)} PCS)", size=12,
+                            color=INK_SOFT),
+                    ft.Text("<", size=12, color=INK_SOFT)]
+            for j, s in enumerate(serials):
+                if j:
+                    line.append(ft.Text(":", size=12, color=INK_SOFT))
+                line.append(ft.Container(
+                    ft.Text(s.upper(), size=12.5, color="#DC2626"),
+                    tooltip="Click to remove",
+                    on_click=lambda e, s=s: remove_from_cart(s)))
+            line.append(ft.Text(">", size=12, color=INK_SOFT))
+            rows.append(ft.Row(line, spacing=6, wrap=True))
+        cart_list.controls = rows
+
+    def do_checkout(e=None):
+        cart = out_state["cart"]
+        customer = out_customer.value.strip()
+        if not cart:
+            out_msg.value = "CART IS EMPTY — ADD UNITS FIRST."
+            out_msg.color = "#DC2626"
+            page.update()
+            return
+        if not customer:
+            out_msg.value = "ENTER A CUSTOMER NAME BEFORE CHECKING OUT."
+            out_msg.color = "#DC2626"
+            page.update()
+            return
+        done = stock_store.stock_out(cart, customer, out_date.value.strip())
+        out_msg.value = (f"CHECKED OUT {len(done)} UNIT(S) TO "
+                         f"{customer.upper()}.")
+        out_msg.color = TEAL
+        out_state["cart"] = []
+        out_customer.value = ""
+        render_out()
+
+    stock_out_view = ft.Column(
+        [card(ft.Column([
+            ft.Row([ft.Text("Stock Out", size=15,
+                            weight=ft.FontWeight.W_600),
+                    ft.Container(expand=True), add_cart_btn]),
+            out_search,
+            out_ribbon,
+            out_panel,
+            ft.Divider(height=1, color=LINE),
+            cart_title,
+            cart_list,
+            ft.Row([out_customer, out_date,
+                    ft.IconButton(ft.Icons.CALENDAR_MONTH, icon_size=18,
+                                  tooltip="Pick Date Out",
+                                  on_click=lambda e: page.show_dialog(
+                                      out_picker)),
+                    ft.Button("Checkout", bgcolor=TEAL, color="white",
+                              elevation=0, on_click=do_checkout)],
+                   spacing=8,
+                   vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            out_msg,
+        ], spacing=12, scroll=ft.ScrollMode.AUTO, expand=True), expand=True)],
+        expand=True, visible=False,
+    )
+
     # ---- Stock Tracker nav: the extractor IS screen 1 (Stock In);
-    # screens 4/5 are ported one at a time into these tabs.
+    # screen 5 is ported next.
     TABS = ["1  Stock In", "3  Available Stock", "4  Stock Out",
             "5  Track List"]
     nav_btns = {}
@@ -1617,11 +1901,18 @@ def main(page: ft.Page):
     def switch_tab(name):
         stock_in_row.visible = name == TABS[0]
         available_view.visible = name == TABS[1]
-        placeholder.visible = name in TABS[2:]
+        stock_out_view.visible = name == TABS[2]
+        placeholder.visible = name == TABS[3]
         if placeholder.visible:
             placeholder_text.value = f"{name.strip()} — coming next"
         if available_view.visible:
             reload_stock()
+        if stock_out_view.visible:
+            if stock_store is not None:
+                stock_store.load()
+            out_state.update(type=None, model=None)
+            out_state["selected"].clear()
+            render_out()
         for n, b in nav_btns.items():
             active = n == name
             b.bgcolor = TEAL if active else "#EDF0F2"
@@ -1642,8 +1933,8 @@ def main(page: ft.Page):
                     [
                         header,
                         nav_bar,
-                        ft.Stack([stock_in_row, available_view, placeholder],
-                                 expand=True),
+                        ft.Stack([stock_in_row, available_view,
+                                  stock_out_view, placeholder], expand=True),
                     ],
                     expand=True,
                 ),

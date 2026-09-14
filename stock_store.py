@@ -41,10 +41,12 @@ class StockStore:
 
         self.records, self.types, self.model_to_type, self._serial_set = \
             [], [], {}, set()
-        for row in self.recs.iter_rows(min_row=2, values_only=True):
+        for idx, row in enumerate(
+                self.recs.iter_rows(min_row=2, values_only=True), start=2):
             if not row or row[3] in (None, ""):
                 continue
             rec = dict(zip(RECORD_HEADER, ("" if v is None else v for v in row)))
+            rec["_row"] = idx  # Excel row, so updates hit the right cells
             self.records.append(rec)
             self._serial_set.add(str(rec["Serial"]).strip().lower())
         for row in self.types_sheet.iter_rows(min_row=2, values_only=True):
@@ -131,10 +133,35 @@ class StockStore:
             self.records.append({"Supplier": supplier, "Type": type_name,
                                  "Model": model, "Serial": s,
                                  "Date In": date_in, "Status": "In Stock",
-                                 "Customer": "", "Date Out": ""})
+                                 "Customer": "", "Date Out": "",
+                                 "_row": self.recs.max_row})
             self._serial_set.add(s.lower())
         if serials:
             self.save()
+
+    def stock_out(self, serials: list[str], customer: str, date_out: str):
+        """Mark units Sold with one Customer + Date Out for the whole cart.
+
+        Matches on Serial (case-insensitive) among In Stock rows only.
+        Returns the serials actually marked.
+        """
+        wanted = {s.strip().lower() for s in serials if s.strip()}
+        done = []
+        for rec in self.records:
+            if (str(rec["Serial"]).strip().lower() not in wanted
+                    or str(rec["Status"]).strip() != "In Stock"):
+                continue
+            rec["Status"] = "Sold"
+            rec["Customer"] = customer
+            rec["Date Out"] = date_out
+            row = rec["_row"]
+            self.recs.cell(row=row, column=6, value="Sold")
+            self.recs.cell(row=row, column=7, value=customer)
+            self.recs.cell(row=row, column=8, value=date_out)
+            done.append(str(rec["Serial"]))
+        if done:
+            self.save()
+        return done
 
     # ---------------------------------------------------------- types
     def assign_type(self, model: str, type_name: str):
