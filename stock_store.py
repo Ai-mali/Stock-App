@@ -175,6 +175,36 @@ class StockStore:
             self.map_sheet.append([model.strip(), type_name])
         self.save()
 
+    def rename_type(self, old: str, new: str):
+        """Rename a Type everywhere: Types, ModelTypes and every record."""
+        old, new = old.strip(), new.strip()
+        if not new or old == new:
+            return False
+        if new in self.types:
+            return False
+        self.types = [new if t == old else t for t in self.types]
+        for row in range(2, self.types_sheet.max_row + 1):
+            if str(self.types_sheet.cell(row=row, column=1).value or
+                   "").strip() == old:
+                self.types_sheet.cell(row=row, column=1, value=new)
+        for key, val in list(self.model_to_type.items()):
+            if val == old:
+                self.model_to_type[key] = new
+        for row in range(2, self.map_sheet.max_row + 1):
+            if str(self.map_sheet.cell(row=row, column=2).value or
+                   "").strip() == old:
+                self.map_sheet.cell(row=row, column=2, value=new)
+        for rec in self.records:
+            if str(rec["Type"]).strip() == old:
+                rec["Type"] = new
+                self.recs.cell(row=rec["_row"], column=2, value=new)
+        self.save()
+        return True
+
+    def models_for_type(self, type_name: str) -> list[str]:
+        return sorted({str(r["Model"]) for r in self.records
+                       if str(r["Type"]).strip() == type_name})
+
     def add_type(self, type_name: str) -> bool:
         type_name = type_name.strip()
         if not type_name or type_name in self.types:

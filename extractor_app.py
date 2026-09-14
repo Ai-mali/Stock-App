@@ -1203,6 +1203,7 @@ def main(page: ft.Page):
             state["added"].add(pending_send["i"])
             log(f"ADDED {len(added)} UNIT(S) OF {r['model'].upper()}.", ok=True)
             set_results(state["rows"])
+            render_type_bar()
         if dupes:
             log(f"DUPLICATED SERIAL NUMBER: {', '.join(dupes).upper()}")
 
@@ -1459,6 +1460,129 @@ def main(page: ft.Page):
         expand=True,
     )
 
+    # ---- Type ribbon on Stock In: one open Type at a time, listing its
+    # Models, with Rename (propagates everywhere) and + to add a Type.
+    type_bar = ft.Row(wrap=True, spacing=8, run_spacing=8)
+    type_panel = ft.Column(spacing=0, visible=False)
+    ribbon_open = {"type": None}
+
+    def toggle_type_ribbon(name: str):
+        ribbon_open["type"] = None if ribbon_open["type"] == name else name
+        render_type_bar()
+
+    def render_type_bar():
+        if stock_store is None:
+            return
+        active = ribbon_open["type"]
+        if active not in stock_store.types:
+            active = ribbon_open["type"] = None
+        type_bar.controls = [
+            ft.Container(
+                ft.Text(t, size=12.5, weight=ft.FontWeight.W_600,
+                        color="white" if t == active else INK),
+                bgcolor=TEAL if t == active else "#EDF0F2",
+                border_radius=99, padding=ft.Padding(14, 7, 14, 7),
+                on_click=lambda e, t=t: toggle_type_ribbon(t),
+            ) for t in stock_store.types
+        ]
+        type_bar.controls.append(ft.Container(
+            ft.Text("+", size=15, weight=ft.FontWeight.W_700, color=INK_SOFT),
+            bgcolor="#EDF0F2", border_radius=99,
+            padding=ft.Padding(14, 4, 14, 4), tooltip="Add Type",
+            on_click=lambda e: open_add_type(),
+        ))
+        type_panel.visible = bool(active)
+        if active:
+            models = stock_store.models_for_type(active)
+            type_panel.controls = [ft.Container(
+                ft.Column([
+                    ft.Row([
+                        ft.Text(active, size=13, weight=ft.FontWeight.W_700,
+                                color=TEAL),
+                        ft.Container(expand=True),
+                        ft.TextButton("Rename",
+                                      on_click=lambda e, t=active:
+                                      open_rename_type(t)),
+                    ]),
+                    ft.Row([ft.Container(
+                        ft.Text(m, size=12.5),
+                        bgcolor="#F4F6F7", border_radius=6,
+                        border=ft.Border.all(1, LINE),
+                        padding=ft.Padding(10, 5, 10, 5)) for m in models]
+                        or [ft.Text("No models yet.", size=12.5,
+                                    color=INK_SOFT)],
+                        wrap=True, spacing=8, run_spacing=8),
+                ], spacing=8),
+                bgcolor="#F9FBFA", border_radius=10, padding=12,
+                border=ft.Border.only(top=ft.BorderSide(3, TEAL)))]
+        page.update()
+
+    type_name_field = ft.TextField(label="Type name", dense=True)
+    type_name_err = ft.Text("", color="#DC2626", size=12, visible=False)
+    type_name_note = ft.Text("", size=12, color=INK_SOFT)
+    renaming = {"old": ""}
+    type_name_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("", size=15, weight=ft.FontWeight.W_600),
+        content=ft.Container(
+            ft.Column([type_name_note, type_name_field, type_name_err],
+                      tight=True, spacing=10),
+            width=360, height=150),
+        actions=[
+            ft.TextButton("Cancel",
+                          on_click=lambda e: _close_type_name()),
+            ft.FilledButton("Save", on_click=lambda e: _save_type_name()),
+        ],
+    )
+    page.overlay.append(type_name_dialog)
+
+    def open_add_type():
+        renaming["old"] = ""
+        type_name_dialog.title.value = "Add Type"
+        type_name_note.value = "Add a new Type to the list."
+        type_name_field.value = ""
+        type_name_err.visible = False
+        type_name_dialog.open = True
+        page.update()
+
+    def open_rename_type(old: str):
+        renaming["old"] = old
+        type_name_dialog.title.value = "Rename Type"
+        type_name_note.value = ("Renaming updates this Type everywhere it's "
+                                "used — Stock In, Available Stock, Stock Out "
+                                "and Track List.")
+        type_name_field.value = old
+        type_name_err.visible = False
+        type_name_dialog.open = True
+        page.update()
+
+    def _close_type_name():
+        type_name_dialog.open = False
+        page.update()
+
+    def _save_type_name():
+        name = (type_name_field.value or "").strip()
+        old = renaming["old"]
+        if not name:
+            type_name_err.value = "Enter a name."
+            type_name_err.visible = True
+            page.update()
+            return
+        if name != old and name in stock_store.types:
+            type_name_err.value = "That Type already exists."
+            type_name_err.visible = True
+            page.update()
+            return
+        if old:
+            stock_store.rename_type(old, name)
+            ribbon_open["type"] = name
+            log(f"TYPE RENAMED: {old.upper()} -> {name.upper()}.", ok=True)
+        else:
+            stock_store.add_type(name)
+            log(f"TYPE ADDED: {name.upper()}.", ok=True)
+        type_name_dialog.open = False
+        render_type_bar()
+
     stock_in_row = ft.Row(
         [
             ft.Column(
@@ -1472,6 +1596,12 @@ def main(page: ft.Page):
         vertical_alignment=ft.CrossAxisAlignment.START,
         spacing=16,
         expand=True,
+    )
+
+    stock_in_view = ft.Column(
+        [card(ft.Column([type_bar, type_panel], spacing=10)), stock_in_row],
+        spacing=12, expand=True, visible=False,
+        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
     )
 
     # ------------------------------------------------- 3 Available Stock
@@ -2055,7 +2185,9 @@ def main(page: ft.Page):
     nav_btns = {}
 
     def switch_tab(name):
-        stock_in_row.visible = name == TABS[0]
+        stock_in_view.visible = name == TABS[0]
+        if stock_in_view.visible:
+            render_type_bar()
         available_view.visible = name == TABS[1]
         stock_out_view.visible = name == TABS[2]
         track_view.visible = name == TABS[3]
@@ -2089,7 +2221,7 @@ def main(page: ft.Page):
                     [
                         header,
                         nav_bar,
-                        ft.Stack([stock_in_row, available_view,
+                        ft.Stack([stock_in_view, available_view,
                                   stock_out_view, track_view], expand=True),
                     ],
                     expand=True,
