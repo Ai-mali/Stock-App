@@ -547,8 +547,10 @@ def main(page: ft.Page):
         results_body.controls = result_rows
         serial_count = sum(len([s for s in r["serial"].split(",") if s.strip()])
                            for r in rows if r["serial"])
+        qty_total = sum(_qty_int(r.get("qty", "")) for r in rows)
         head_model.content.value = f"Model ({len(rows)})"
         head_serial.content.value = f"Serial ({serial_count})"
+        head_qty.content.value = f"Qty ({qty_total})" if rows else "Qty"
         badge.content.controls[1].value = f"{len(rows)} models found"
         badge.visible = bool(rows)
         page.update()
@@ -1225,6 +1227,18 @@ def main(page: ft.Page):
         edit_model.value = r["model"]
         edit_serial.value = r["serial"] or r["desc"]
         edit_qty.value = r.get("qty", "")
+        edit_dialog.title.value = "Edit row"
+        edit_dialog.open = True
+        page.show_dialog(edit_dialog)
+        page.update()
+
+    def open_add_row(e=None):
+        edit_idx["i"] = -1
+        edit_no.value = ""
+        edit_model.value = ""
+        edit_serial.value = ""
+        edit_qty.value = ""
+        edit_dialog.title.value = "Add row"
         edit_dialog.open = True
         page.show_dialog(edit_dialog)
         page.update()
@@ -1235,10 +1249,12 @@ def main(page: ft.Page):
 
     def save_edit():
         i = edit_idx["i"]
-        if i < 0:
-            close_edit()
-            return
-        r = state["rows"][i]
+        new_row = i < 0
+        if new_row:
+            r = {"no": "", "model": "", "serial": "", "qty": "",
+                 "desc": "", "flag": ""}
+        else:
+            r = state["rows"][i]
         r["no"] = edit_no.value.strip()
         r["model"] = edit_model.value.strip().upper()
         val = edit_serial.value.strip()
@@ -1259,9 +1275,12 @@ def main(page: ft.Page):
             r["flag"] = "qty_mismatch"
         else:
             r["flag"] = ""
+        if new_row:
+            state["rows"].append(r)
         set_results(state["rows"])
         close_edit()
-        log(f"Row {r['no'] or i+1} updated.")
+        log((f"Row {r['no'] or len(state['rows'])} added manually."
+             if new_row else f"Row {r['no'] or i+1} updated."))
 
     # ------------------------------------------------------------- layout
     header = ft.Container(
@@ -1329,6 +1348,10 @@ def main(page: ft.Page):
                     [ft.Text("Scan Results", size=15, weight=ft.FontWeight.W_600),
                      ft.Container(expand=True),
                      badge,
+                     ft.IconButton(ft.Icons.ADD_CIRCLE_OUTLINE, icon_size=20,
+                                   icon_color=TEAL,
+                                   tooltip="Add a row manually",
+                                   on_click=open_add_row),
                      ft.IconButton(ft.Icons.DOWNLOAD, icon_size=18,
                                    tooltip="Export CSV", on_click=export_csv)],
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
