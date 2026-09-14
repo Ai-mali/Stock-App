@@ -574,6 +574,13 @@ def main(page: ft.Page):
                                f"{_cfg()['model']}"
                                if _cfg()["keys"] else
                                f"{PROVIDERS[eng]['label']}: no key saved yet")
+        # repaint the router controls — they're already mounted by the time
+        # the user picks a provider
+        for c in (provider_dd, model_dd, new_key_field, footer_status):
+            try:
+                c.update()
+            except RuntimeError:
+                pass
 
     def on_provider_change(e):
         state["key_engine"] = provider_dd.value
