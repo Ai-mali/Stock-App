@@ -389,15 +389,6 @@ def main(page: ft.Page):
         tooltip="Click to zoom",
     )
 
-    badge = ft.Container(
-        content=ft.Row(
-            [ft.Icon(ft.Icons.CHECK_CIRCLE, size=14, color=TEAL),
-             ft.Text("0 models found", color=TEAL, size=12, weight=ft.FontWeight.W_500)],
-            spacing=4, tight=True),
-        bgcolor=TEAL_BG, border_radius=20, padding=ft.Padding(10, 4, 10, 4),
-        visible=False,
-    )
-
     # ---- batch-level Stock In details: one Supplier + one Date In shared
     # by every scanned row, same rule as the manual Stock In form.
     supplier_field = ft.TextField(
@@ -551,8 +542,6 @@ def main(page: ft.Page):
         head_model.content.value = f"Model ({len(rows)})"
         head_serial.content.value = f"Serial ({serial_count})"
         head_qty.content.value = f"Qty ({qty_total})" if rows else "Qty"
-        badge.content.controls[1].value = f"{len(rows)} models found"
-        badge.visible = bool(rows)
         page.update()
         return serial_count
 
@@ -1170,7 +1159,6 @@ def main(page: ft.Page):
         img_empty.visible = True
         _update_buttons()  # re-lock SCAN once the image is cleared
         set_results([])
-        badge.visible = False
         log_list.controls.clear()
         log("Cleared. Waiting for image payload...")
 
@@ -1347,7 +1335,6 @@ def main(page: ft.Page):
                 ft.Row(
                     [ft.Text("Scan Results", size=15, weight=ft.FontWeight.W_600),
                      ft.Container(expand=True),
-                     badge,
                      ft.IconButton(ft.Icons.ADD_CIRCLE_OUTLINE, icon_size=20,
                                    icon_color=TEAL,
                                    tooltip="Add a row manually",
