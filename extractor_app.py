@@ -1862,7 +1862,7 @@ def main(page: ft.Page):
             ft.Row([ft.Text("Stock Out", size=15,
                             weight=ft.FontWeight.W_600),
                     ft.Container(expand=True), add_cart_btn]),
-            out_search,
+            ft.Row([out_search]),
             out_ribbon,
             out_panel,
             ft.Divider(height=1, color=LINE),
@@ -1882,29 +1882,185 @@ def main(page: ft.Page):
         expand=True, visible=False,
     )
 
-    # ---- Stock Tracker nav: the extractor IS screen 1 (Stock In);
-    # screen 5 is ported next.
+    # ------------------------------------------------------ 5 Track List
+    # Every sold unit, free-text search plus Excel-style per-column
+    # filters (Select all / Clear / OK / Cancel) and removable chips.
+    TRACK_COLS = [("Type", 2), ("Model", 3), ("Serial", 3), ("Date In", 2),
+                  ("Take out date", 2), ("Customer", 3)]
+    TRACK_FIELD = {"Take out date": "Date Out"}
+    track_filters: dict[str, set] = {}   # col -> allowed values (absent = all)
+    track_search = ft.TextField(hint_text="Search anything in the list",
+                                dense=True, expand=True,
+                                prefix_icon=ft.Icons.SEARCH,
+                                on_change=lambda e: render_track())
+    track_header = ft.Row(spacing=0)
+    track_body = ft.Column(spacing=0, scroll=ft.ScrollMode.AUTO, expand=True)
+    track_chips = ft.Row(wrap=True, spacing=6, run_spacing=6)
+
+    def _sold_rows() -> list[dict]:
+        if stock_store is None:
+            return []
+        return [r for r in stock_store.records
+                if str(r.get("Status", "")).strip() == "Sold"]
+
+    def _track_val(rec: dict, col: str) -> str:
+        return str(rec.get(TRACK_FIELD.get(col, col), "") or "")
+
+    def _track_matches(rec: dict) -> bool:
+        q = (track_search.value or "").strip().lower()
+        if q and q not in " ".join(
+                _track_val(rec, c).lower() for c, _ in TRACK_COLS):
+            return False
+        return all(_track_val(rec, c) in vals
+                   for c, vals in track_filters.items())
+
+    # ---- per-column filter popover
+    filter_col = {"col": ""}
+    filter_boxes = ft.Column(spacing=0, scroll=ft.ScrollMode.AUTO, height=220)
+    filter_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("", size=14, weight=ft.FontWeight.W_600),
+        content=ft.Container(
+            ft.Column([
+                ft.Row([
+                    ft.TextButton("Select all",
+                                  on_click=lambda e: _set_all_boxes(True)),
+                    ft.TextButton("Clear",
+                                  on_click=lambda e: _set_all_boxes(False)),
+                ], spacing=4),
+                filter_boxes,
+            ], tight=True, spacing=4),
+            width=280, height=270),
+        actions=[
+            ft.TextButton("Cancel", on_click=lambda e: _close_filter()),
+            ft.FilledButton("OK", on_click=lambda e: _apply_filter()),
+        ],
+    )
+    page.overlay.append(filter_dialog)
+
+    def _set_all_boxes(checked: bool):
+        for cb in filter_boxes.controls:
+            if isinstance(cb, ft.Checkbox):
+                cb.value = checked
+        page.update()
+
+    def open_filter(col: str):
+        filter_col["col"] = col
+        values = sorted({_track_val(r, col) for r in _sold_rows()
+                         if _track_val(r, col)})
+        allowed = track_filters.get(col)
+        filter_boxes.controls = [
+            ft.Checkbox(label=v, value=(allowed is None or v in allowed),
+                        label_style=ft.TextStyle(size=12.5))
+            for v in values
+        ] or [ft.Text("No values yet.", size=12.5, color=INK_SOFT)]
+        filter_dialog.title.value = f"Filter {col}"
+        filter_dialog.open = True
+        page.update()
+
+    def _close_filter():
+        filter_dialog.open = False
+        page.update()
+
+    def _apply_filter():
+        col = filter_col["col"]
+        boxes = [c for c in filter_boxes.controls
+                 if isinstance(c, ft.Checkbox)]
+        checked = {c.label for c in boxes if c.value}
+        if not boxes or len(checked) == len(boxes):
+            track_filters.pop(col, None)   # all selected = no filter
+        else:
+            track_filters[col] = checked
+        filter_dialog.open = False
+        render_track()
+
+    def clear_filter(col: str):
+        track_filters.pop(col, None)
+        render_track()
+
+    def render_track():
+        track_header.controls = []
+        for col, flex in TRACK_COLS:
+            on = col in track_filters
+            track_header.controls.append(ft.Container(
+                ft.Row([
+                    ft.Text(col, size=12, weight=ft.FontWeight.W_600,
+                            color=INK_SOFT),
+                    ft.IconButton(ft.Icons.FILTER_ALT if on
+                                  else ft.Icons.FILTER_ALT_OUTLINED,
+                                  icon_size=14, tooltip=f"Filter {col}",
+                                  icon_color=TEAL if on else "#B9BEC5",
+                                  on_click=lambda e, c=col: open_filter(c)),
+                ], spacing=0, tight=True),
+                expand=flex, padding=ft.Padding(10, 4, 4, 4)))
+
+        track_chips.controls = [
+            ft.Container(
+                ft.Row([ft.Text(f"{c}: {', '.join(sorted(v))}", size=11.5),
+                        ft.Icon(ft.Icons.CLOSE, size=12, color=INK_SOFT)],
+                       spacing=4, tight=True),
+                bgcolor="#EDF0F2", border_radius=99,
+                padding=ft.Padding(10, 4, 8, 4),
+                tooltip="Remove this filter",
+                on_click=lambda e, c=c: clear_filter(c),
+            ) for c, v in track_filters.items()
+        ]
+
+        rows = [r for r in _sold_rows() if _track_matches(r)]
+        rows.sort(key=lambda r: str(r.get("Date Out", "")), reverse=True)
+        track_body.controls = []
+        if not rows:
+            track_body.controls.append(
+                ft.Container(ft.Text("No sold units match.", size=13,
+                                     color=INK_SOFT), padding=14))
+        for i, r in enumerate(rows):
+            track_body.controls.append(ft.Container(
+                ft.Row([
+                    ft.Container(
+                        ft.Text(_track_val(r, col).upper()
+                                if col == "Serial" else _track_val(r, col),
+                                size=12.5),
+                        expand=flex, padding=ft.Padding(10, 8, 4, 8))
+                    for col, flex in TRACK_COLS
+                ], spacing=0),
+                bgcolor="#FFFFFF" if i % 2 == 0 else "#FAFBFC",
+                border=ft.Border.only(bottom=ft.BorderSide(1, "#EEF1F3"))))
+        page.update()
+
+    track_view = ft.Column(
+        [card(ft.Column([
+            ft.Row([ft.Text("Record of Stock Out", size=15,
+                            weight=ft.FontWeight.W_600),
+                    ft.Container(expand=True),
+                    ft.IconButton(ft.Icons.REFRESH, icon_size=18,
+                                  tooltip="Reload from Excel",
+                                  on_click=lambda e: reload_track())]),
+            ft.Row([track_search]),
+            track_chips,
+            ft.Container(track_header, bgcolor="#F4F6F7",
+                         border_radius=6),
+            track_body,
+        ], spacing=10, expand=True), expand=True)],
+        expand=True, visible=False,
+    )
+
+    def reload_track():
+        if stock_store is not None:
+            stock_store.load()
+        render_track()
+
+    # ---- Stock Tracker nav: the extractor IS screen 1 (Stock In)
     TABS = ["1  Stock In", "3  Available Stock", "4  Stock Out",
             "5  Track List"]
     nav_btns = {}
-    placeholder_text = ft.Text("", color=INK_SOFT, size=13)
-    placeholder = ft.Container(
-        content=ft.Column(
-            [ft.Icon(ft.Icons.CONSTRUCTION, size=44, color=INK_SOFT),
-             placeholder_text],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            alignment=ft.MainAxisAlignment.CENTER, spacing=8),
-        bgcolor=CARD, border_radius=12, border=ft.Border.all(1, LINE),
-        expand=True, visible=False,
-    )
 
     def switch_tab(name):
         stock_in_row.visible = name == TABS[0]
         available_view.visible = name == TABS[1]
         stock_out_view.visible = name == TABS[2]
-        placeholder.visible = name == TABS[3]
-        if placeholder.visible:
-            placeholder_text.value = f"{name.strip()} — coming next"
+        track_view.visible = name == TABS[3]
+        if track_view.visible:
+            reload_track()
         if available_view.visible:
             reload_stock()
         if stock_out_view.visible:
@@ -1934,7 +2090,7 @@ def main(page: ft.Page):
                         header,
                         nav_bar,
                         ft.Stack([stock_in_row, available_view,
-                                  stock_out_view, placeholder], expand=True),
+                                  stock_out_view, track_view], expand=True),
                     ],
                     expand=True,
                 ),
