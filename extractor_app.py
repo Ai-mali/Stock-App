@@ -950,7 +950,8 @@ def main(page: ft.Page):
                 client = genai.Client(api_key=key)
                 for attempt in range(3):
                     try:
-                        resp = client.models.generate_content(
+                        resp = await asyncio.to_thread(
+                            client.models.generate_content,
                             model=model, contents=contents)
                         break
                     except Exception as ex:
