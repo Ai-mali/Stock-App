@@ -1213,7 +1213,7 @@ def main(page: ft.Page):
     ACC = "#6366F1"   # modal accent (indigo) on white
     type_mode = {"mode": "existing"}
     type_dd = ft.Dropdown(dense=True, expand=True, border_radius=7,
-                          on_change=lambda e: _type_refresh())
+                          on_select=lambda e: _type_refresh())
     type_new = ft.TextField(hint_text="e.g. Multi Split", dense=True,
                             border_radius=7,
                             on_change=lambda e: _type_refresh())
