@@ -1210,22 +1210,107 @@ def main(page: ft.Page):
 
     # ---- new-Model Type assignment (same modal as Stock In spec)
     pending_send = {"i": -1, "supplier": "", "date_in": ""}
-    type_dd = ft.Dropdown(label="Existing Type", dense=True)
-    type_new = ft.TextField(label="Or new Type name", dense=True)
+    ACC = "#6366F1"   # modal accent (indigo) on white
+    type_mode = {"mode": "existing"}
+    type_dd = ft.Dropdown(dense=True, expand=True, border_radius=7)
+    type_new = ft.TextField(hint_text="e.g. Multi Split", dense=True,
+                            border_radius=7,
+                            on_change=lambda e: _type_refresh())
     type_err = ft.Text("", color="#DC2626", size=12, visible=False)
+    type_title = ft.Text("", size=15, weight=ft.FontWeight.W_600,
+                         spans=[ft.TextSpan(
+                             "", ft.TextStyle(color=ACC,
+                                              weight=ft.FontWeight.W_700))])
+    type_hint = ft.Text("", size=11.5, color=INK_SOFT, visible=False)
+    will_assign = ft.Text("No type selected", size=11.5, color=INK_SOFT,
+                          spans=[ft.TextSpan(
+                              "", ft.TextStyle(color=INK,
+                                               weight=ft.FontWeight.W_600))])
+    confirm_btn = ft.FilledButton("Confirm", bgcolor=ACC, color="white",
+                                  on_click=lambda e: confirm_type_modal())
+    tog_existing = ft.Container()
+    tog_new = ft.Container()
+
+    def _toggle_btn(name: str, label: str):
+        return ft.Container(
+            ft.Text(label, size=13,
+                    weight=ft.FontWeight.W_500, color=INK),
+            expand=True, border_radius=6,
+            alignment=ft.Alignment(0, 0), height=32,
+            on_click=lambda e: _set_type_mode(name),
+        )
+
+    tog_existing = _toggle_btn("existing", "Existing type")
+    tog_new = _toggle_btn("new", "New type")
+    new_panel = ft.Column([
+        ft.Text("TYPE NAME", size=10, color=INK_SOFT,
+                weight=ft.FontWeight.W_600),
+        type_new,
+        type_hint,
+    ], spacing=8)
+    existing_panel = ft.Column([
+        ft.Text("TYPE", size=10, color=INK_SOFT,
+                weight=ft.FontWeight.W_600),
+        type_dd,
+    ], spacing=8)
+
+    def _chosen_type() -> str:
+        if type_mode["mode"] == "new":
+            return (type_new.value or "").strip()
+        return type_dd.value or ""
+
+    def _type_refresh():
+        m = type_mode["mode"]
+        for c, n in ((tog_existing, "existing"), (tog_new, "new")):
+            active = n == m
+            c.bgcolor = "white" if active else "transparent"
+            c.border = ft.Border.all(1, LINE) if active else None
+            c.shadow = (ft.BoxShadow(blur_radius=3, color="#14000000",
+                                     offset=ft.Offset(0, 1)) if active
+                        else None)
+        existing_panel.visible = m == "existing"
+        new_panel.visible = m == "new"
+        v = (type_new.value or "").strip()
+        type_hint.value = f'A new type "{v}" will be created.' if v else ""
+        type_hint.visible = m == "new" and bool(v)
+        chosen = _chosen_type()
+        will_assign.spans[0].text = chosen
+        will_assign.value = ("No type selected" if not chosen
+                             else "Will assign ")
+        type_err.visible = False
+        confirm_btn.disabled = not chosen
+        page.update()
+
+    def _set_type_mode(name: str):
+        type_mode["mode"] = name
+        _type_refresh()
+
     type_dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text("", size=15, weight=ft.FontWeight.W_600),
+        modal=True, bgcolor="white",
+        title=ft.Column([
+            ft.Container(ft.Text("NEW MODEL", size=10,
+                                 weight=ft.FontWeight.W_600, color=ACC),
+                         bgcolor="#EEF0FE", border_radius=4,
+                         padding=ft.Padding(7, 3, 7, 3)),
+            type_title,
+            ft.Text("Select an existing type or define a new one to "
+                    "continue.", size=12.5, color=INK_SOFT),
+        ], spacing=8, tight=True),
         content=ft.Container(
-            ft.Column([type_dd, ft.Text("— OR —", size=11, color=INK_SOFT),
-                       type_new, type_err],
-                      tight=True, spacing=10,
-                      alignment=ft.MainAxisAlignment.START),
-            width=360, height=190),
-        actions=[
-            ft.TextButton("Cancel", on_click=lambda e: close_type_modal()),
-            ft.FilledButton("Confirm", on_click=lambda e: confirm_type_modal()),
-        ],
+            ft.Column([
+                ft.Container(
+                    ft.Row([tog_existing, tog_new], spacing=4),
+                    bgcolor="#F4F5F7", border_radius=8, padding=4,
+                    border=ft.Border.all(1, LINE)),
+                existing_panel,
+                new_panel,
+                type_err,
+            ], tight=True, spacing=14),
+            width=400),
+        actions=[will_assign,
+                 ft.TextButton("Cancel",
+                               on_click=lambda e: close_type_modal()),
+                 confirm_btn],
     )
     page.overlay.append(type_dialog)
 
@@ -1233,14 +1318,13 @@ def main(page: ft.Page):
         pending_send["supplier"] = supplier_field.value.strip()
         pending_send["date_in"] = date_in_field.value.strip()
         type_dd.options = [ft.dropdown.Option(t) for t in stock_store.types]
-        type_dd.value = None
+        type_dd.value = stock_store.types[0] if stock_store.types else None
         type_new.value = ""
-        type_err.visible = False
-        type_dialog.title.value = (
-            f'New model "{model.upper()}" needs a Type. '
-            f"Pick one, or add a new one below.")
+        type_mode["mode"] = "existing"
+        type_title.value = "Assign a type to "
+        type_title.spans[0].text = model.upper()
         type_dialog.open = True
-        page.update()
+        _type_refresh()
 
     def close_type_modal():
         # Cancel discards the pending row — nothing saves, model not remembered
@@ -1249,7 +1333,7 @@ def main(page: ft.Page):
         page.update()
 
     def confirm_type_modal():
-        chosen = type_new.value.strip() or (type_dd.value or "")
+        chosen = _chosen_type()
         if not chosen:
             type_err.value = "Pick an existing Type, or enter a new one."
             type_err.visible = True
