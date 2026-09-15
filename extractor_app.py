@@ -1212,7 +1212,8 @@ def main(page: ft.Page):
     pending_send = {"i": -1, "supplier": "", "date_in": ""}
     ACC = "#6366F1"   # modal accent (indigo) on white
     type_mode = {"mode": "existing"}
-    type_dd = ft.Dropdown(dense=True, expand=True, border_radius=7)
+    type_dd = ft.Dropdown(dense=True, expand=True, border_radius=7,
+                          on_change=lambda e: _type_refresh())
     type_new = ft.TextField(hint_text="e.g. Multi Split", dense=True,
                             border_radius=7,
                             on_change=lambda e: _type_refresh())
@@ -1684,7 +1685,7 @@ def main(page: ft.Page):
     )
 
     stock_in_view = ft.Column(
-        [card(ft.Column([type_bar, type_panel], spacing=10)), stock_in_row],
+        [stock_in_row],
         spacing=12, expand=True, visible=False,
         horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
     )
