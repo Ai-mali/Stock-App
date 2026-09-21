@@ -1,0 +1,3262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AC Stock Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-page: #13171b;
+  --bg-app: #0f1417;
+  --header-bg: #0f1417;
+  --surface: #141b1f;
+  --surface2: #192227;
+  --surface3: #1f2b32;
+  --border: #233038;
+  --border-light: #2c3c46;
+  --text: #e6edf2;
+  --text-muted: #8495a1;
+  --text-sub: #5f717d;
+  
+  --green: #116852;
+  --green-hover: #0e5644;
+  --green-bright: #26d07c;
+  --green-glow: rgba(38, 208, 124, 0.2);
+  --green-badge-bg: rgba(38, 208, 124, 0.12);
+  --green-badge-border: rgba(38, 208, 124, 0.28);
+  
+  --blue-tag: #2563eb;
+  --orange-tag: #d97706;
+  --red-tag: #dc2626;
+  --red-badge-bg: rgba(220, 38, 38, 0.14);
+  --red-badge-border: rgba(220, 38, 38, 0.3);
+  --red-badge-text: #f87171;
+}
+
+body.theme-light {
+  --bg-page: #e8eef3;
+  --bg-app: #ffffff;
+  --header-bg: #ffffff;
+  --surface: #f8fafc;
+  --surface2: #f1f5f8;
+  --surface3: #e2e9ef;
+  --border: #d3dde5;
+  --border-light: #bccbd6;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-sub: #64748b;
+
+  --green: #116852;
+  --green-hover: #0d5442;
+  --green-bright: #0f766e;
+  --green-badge-bg: rgba(17, 104, 82, 0.1);
+  --green-badge-border: rgba(17, 104, 82, 0.25);
+
+  --red-badge-bg: rgba(220, 38, 38, 0.1);
+  --red-badge-border: rgba(220, 38, 38, 0.25);
+  --red-badge-text: #dc2626;
+}
+
+/* Day/Light Mode Specific Component Overrides */
+body.theme-light .app-container {
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
+}
+body.theme-light .image-preview-dropzone {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+body.theme-light .image-preview-dropzone:hover,
+body.theme-light .image-preview-dropzone.dragover {
+  background: #f0fdf4;
+  border-color: #116852;
+  box-shadow: 0 0 18px rgba(17, 104, 82, 0.18), inset 0 0 12px rgba(17, 104, 82, 0.05);
+}
+body.theme-light .dropzone-title {
+  color: #0f172a;
+}
+body.theme-light .dropzone-sub {
+  color: #64748b;
+}
+body.theme-light .dropzone-icon-circle {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #116852;
+}
+body.theme-light .dropzone-tag {
+  background: #e2e8f0;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+body.theme-light .dropzone-file-bar {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+body.theme-light .dropzone-file-info {
+  color: #0f172a;
+}
+body.theme-light .dropzone-img-wrapper {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+body.theme-light .status-log-console {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+body.theme-light .card-glow-bar-left,
+body.theme-light .card-glow-bar-right {
+  background: #116852;
+  box-shadow: 0 0 8px 2px rgba(17, 104, 82, 0.7);
+}
+body.theme-light .avail-unit-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+body.theme-light .avail-unit-card:hover {
+  background: #f0fdf4;
+  border-color: rgba(17, 104, 82, 0.4);
+  box-shadow: -6px 0 18px -4px rgba(17, 104, 82, 0.45), 6px 0 18px -4px rgba(17, 104, 82, 0.45);
+}
+body.theme-light .avail-unit-card:hover .serial-text {
+  color: #116852;
+  text-shadow: none;
+}
+body.theme-light .so-serial-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+body.theme-light .so-serial-card:hover {
+  background: #f0fdf4;
+  border-color: rgba(17, 104, 82, 0.4);
+  box-shadow: -6px 0 18px -4px rgba(17, 104, 82, 0.45), 6px 0 18px -4px rgba(17, 104, 82, 0.45);
+}
+body.theme-light .so-serial-card:hover .serial-val {
+  color: #116852 !important;
+  text-shadow: none;
+}
+body.theme-light .so-serial-card.staged {
+  background: #ecfdf5;
+  border-color: #116852;
+}
+body.theme-light .so-serial-card.staged .serial-val {
+  color: #116852;
+}
+body.theme-light .nav-tab-bar {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+body.theme-light .tab-badge {
+  background: #e2e8f0;
+  color: #334155;
+}
+body.theme-light .brand-icon {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #059669;
+}
+body.theme-light .modal-dialog {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18);
+}
+body.theme-light .modal-footer {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+/* Day / Dark Pill Toggle Button */
+.theme-toggle-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: all .2s ease;
+  font-family: inherit;
+  user-select: none;
+}
+.theme-toggle-btn:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.theme-toggle-track {
+  width: 28px;
+  height: 16px;
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  position: relative;
+  transition: all .25s ease;
+}
+.theme-toggle-thumb {
+  width: 10px;
+  height: 10px;
+  background: var(--green-bright);
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: all .25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 6px var(--green-bright);
+}
+body.theme-light .theme-toggle-thumb {
+  left: 14px;
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+}
+.theme-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+.theme-mode-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 16px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  transition: background-color .2s;
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Custom scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* Main outer app container matching 6-screens frame */
+.app-container {
+  width: 100%;
+  max-width: 1360px;
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+/* Header */
+header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #0f362a;
+  border: 1px solid rgba(38, 208, 124, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--green-bright);
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.brand-text h1 {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.brand-text p {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Nav Pills Bar */
+.nav-tab-bar {
+  display: flex;
+  align-items: center;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--text);
+}
+
+.tab-btn.active {
+  background: var(--green);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(17, 104, 82, 0.4);
+}
+
+.tab-badge {
+  font-size: 10.5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.25);
+  color: #9ab0bf;
+  padding: 1px 6px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+}
+
+.tab-btn.active .tab-badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.tab-badge.green-text {
+  color: var(--green-bright);
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-pill-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 5px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+}
+
+.model-pill-btn:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+}
+
+.model-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green-bright);
+  box-shadow: 0 0 8px var(--green-bright);
+  flex-shrink: 0;
+}
+
+.icon-square-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+  font-size: 14px;
+  border: 1px solid var(--border);
+}
+
+.icon-square-btn:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+}
+
+/* Main Views */
+main {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.view-section {
+  display: none;
+  animation: fadeIn .2s ease-out;
+}
+
+.view-section.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Page Headers */
+.view-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.view-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.view-subtitle {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.card-body {
+  padding: 16px 18px;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--green);
+  color: #ffffff;
+  border-color: var(--green);
+}
+
+.btn-primary:hover {
+  background: var(--green-hover);
+  border-color: var(--green-hover);
+}
+
+.btn-ghost {
+  background: var(--surface2);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.btn-ghost:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+}
+
+.btn-danger-ghost {
+  background: transparent;
+  color: #f87171;
+  border: 1px solid #5c2626;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 11px;
+}
+
+.btn-danger-ghost:hover {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: #7f2d2d;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 6px;
+}
+
+.btn-circle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-circle:hover {
+  color: var(--text);
+  border-color: var(--border-light);
+}
+
+/* Form Inputs */
+.form-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 5px;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+  font-family: inherit;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--green-bright);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 84px;
+}
+
+/* Search and Filters Bar */
+.search-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.search-box-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+}
+
+.search-box-wrap input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px 8px 34px;
+  font-size: 12px;
+  color: var(--text);
+  outline: none;
+}
+
+.search-box-wrap input:focus {
+  border-color: var(--green-bright);
+}
+
+.search-box-wrap .search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-sub);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.filter-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pill-filter-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+}
+
+.pill-filter-btn:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+}
+
+.pill-filter-btn.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.pill-filter-btn .tab-badge {
+  background: rgba(0,0,0,0.25);
+  color: inherit;
+  font-size: 10px;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.badge-green {
+  background: var(--green-badge-bg);
+  border: 1px solid var(--green-badge-border);
+  color: var(--green-bright);
+}
+
+.badge-neutral {
+  background: var(--surface3);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.badge-red {
+  background: var(--red-badge-bg);
+  border: 1px solid var(--red-badge-border);
+  color: var(--red-badge-text);
+}
+
+/* Data Tables */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table-scroll-10 {
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+}
+
+.table-scroll-10 thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface2);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+body.theme-light .table-scroll-10 thead th {
+  background: var(--surface2);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table thead th {
+  padding: 10px 14px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.data-table tbody td {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  vertical-align: middle;
+}
+
+/* Stock In Screen Layout */
+.stock-in-layout {
+  display: grid;
+  grid-template-columns: 410px 1fr;
+  gap: 16px;
+}
+
+/* Drag and Drop Image Previewer */
+.image-preview-dropzone {
+  position: relative;
+  background: #0d151c;
+  border: 2px dashed #1e3345;
+  border-radius: 10px;
+  padding: 16px;
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.image-preview-dropzone:hover {
+  border-color: rgba(38, 208, 124, 0.55);
+  background: rgba(38, 208, 124, 0.03);
+  box-shadow: 0 0 18px rgba(38, 208, 124, 0.15);
+}
+
+.image-preview-dropzone.dragover {
+  border-color: var(--green-bright);
+  background: rgba(38, 208, 124, 0.08);
+  box-shadow: 0 0 24px rgba(38, 208, 124, 0.3), inset 0 0 16px rgba(38, 208, 124, 0.08);
+  transform: scale(1.01);
+}
+
+.dropzone-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  gap: 10px;
+  width: 100%;
+}
+
+.dropzone-icon-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(38, 208, 124, 0.1);
+  border: 1px solid rgba(38, 208, 124, 0.25);
+  color: var(--green-bright);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.image-preview-dropzone:hover .dropzone-icon-circle,
+.image-preview-dropzone.dragover .dropzone-icon-circle {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 0 14px rgba(38, 208, 124, 0.35);
+}
+
+.dropzone-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.dropzone-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 290px;
+  line-height: 1.45;
+}
+
+.dropzone-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.dropzone-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text-sub);
+}
+
+/* Loaded Image State */
+.dropzone-preview-display {
+  display: none;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.dropzone-file-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.dropzone-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.dropzone-img-wrapper {
+  position: relative;
+  width: 100%;
+  max-height: 240px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+}
+
+.dropzone-img-wrapper img {
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  display: block;
+}
+
+.preview-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 4px 0;
+  width: 100%;
+}
+
+.btn-preview-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+}
+
+.btn-preview-action:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.btn-preview-action.btn-scan-main {
+  background: linear-gradient(135deg, #137a5f 0%, #0d5a45 100%);
+  border: 1px solid rgba(38, 208, 124, 0.45);
+  color: #ffffff;
+  padding: 0 26px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: 0 4px 16px rgba(19, 122, 95, 0.4), 0 0 12px rgba(38, 208, 124, 0.25);
+}
+
+.btn-preview-action.btn-scan-main:hover {
+  background: linear-gradient(135deg, #168f6f 0%, #106b52 100%);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(19, 122, 95, 0.55), 0 0 16px rgba(38, 208, 124, 0.4);
+}
+
+.btn-preview-action.btn-clear:hover {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Day light mode preview buttons */
+body.theme-light .btn-preview-action {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #334155;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+body.theme-light .btn-preview-action:hover {
+  border-color: #94a3b8;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+body.theme-light .btn-preview-action.btn-scan-main {
+  background: #116852;
+  border-color: #116852;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(17, 104, 82, 0.3);
+}
+
+body.theme-light .btn-preview-action.btn-scan-main:hover {
+  background: #0d5442;
+  box-shadow: 0 6px 18px rgba(17, 104, 82, 0.4);
+}
+
+body.theme-light .btn-preview-action.btn-clear:hover {
+  border-color: #fca5a5;
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+/* Console Status Log */
+.status-log-console {
+  background: #0a0e10;
+  border: 1px solid #172228;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  color: #6e8494;
+  height: 180px;
+  overflow-y: auto;
+  line-height: 1.7;
+}
+
+.log-line-ok {
+  color: var(--green-bright);
+}
+
+.log-line-active {
+  color: #e2b340;
+}
+
+/* Scan Results Card Header Inputs */
+.scan-meta-bar {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.scan-serial-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(38, 208, 124, 0.1);
+  color: var(--green-bright);
+  border: 1px solid rgba(38, 208, 124, 0.2);
+  margin: 1px;
+}
+
+/* Available Stock & Accordion Hierarchy */
+.brand-accordion {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.brand-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface2);
+  cursor: pointer;
+  user-select: none;
+  transition: background .12s;
+}
+
+.brand-accordion-header:hover {
+  background: var(--surface3);
+}
+
+.brand-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-color-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.model-accordion {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: var(--surface);
+}
+
+.model-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.model-index-pill {
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: #64b5f6;
+  background: rgba(100, 181, 246, 0.12);
+  border: 1px solid rgba(100, 181, 246, 0.25);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.model-cards-grid-4, .model-cards-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 14px;
+  max-height: 520px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.avail-unit-card {
+  position: relative;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+/* Eye-catching glowing shimmer & micro-interaction */
+.avail-unit-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 80%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(38, 208, 124, 0.22), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+.avail-unit-card:hover::before {
+  left: 140%;
+}
+
+/* Dual Left + Right Vertical Glow Bars */
+.card-glow-bar-left,
+.card-glow-bar-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--green-bright);
+  box-shadow: 0 0 8px 2px var(--green-bright);
+  transform: scaleY(0);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.card-glow-bar-left {
+  left: 0;
+  transform-origin: center;
+}
+
+.card-glow-bar-right {
+  right: 0;
+  transform-origin: center;
+}
+
+.avail-unit-card:hover .card-glow-bar-left,
+.avail-unit-card:hover .card-glow-bar-right,
+.so-serial-card:hover .card-glow-bar-left,
+.so-serial-card:hover .card-glow-bar-right {
+  transform: scaleY(1);
+}
+
+.avail-unit-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(38, 208, 124, 0.4);
+  background: linear-gradient(135deg, rgba(38, 208, 124, 0.1) 0%, var(--surface2) 100%);
+  box-shadow: -6px 0 18px -4px var(--green-bright), 6px 0 18px -4px var(--green-bright);
+}
+
+.avail-unit-card .avail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.avail-unit-card .serial-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  transition: all 0.2s ease;
+}
+
+.avail-unit-card:hover .serial-text {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(38, 208, 124, 0.95), 0 0 22px rgba(38, 208, 124, 0.6);
+  letter-spacing: 0.04em;
+}
+
+.avail-card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-sub);
+  transition: all 0.2s ease;
+}
+
+.avail-unit-card:hover .avail-card-dot {
+  background: var(--green-bright);
+  box-shadow: 0 0 10px var(--green-bright), 0 0 16px var(--green-bright);
+  transform: scale(1.35);
+}
+
+.avail-unit-card .meta-text {
+  font-size: 11px;
+  color: var(--text-sub);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: color 0.2s;
+}
+
+.avail-unit-card:hover .meta-text {
+  color: #b0d8c9;
+}
+
+.avail-card-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-sub);
+  transition: color 0.2s;
+}
+
+.avail-unit-card:hover .avail-card-tag {
+  color: var(--green-bright);
+  text-shadow: 0 0 8px rgba(38, 208, 124, 0.7);
+}
+
+/* Stock Out 4-Column Grid Chips */
+.stockout-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.stockout-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 14px;
+  max-height: 500px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.so-serial-card {
+  position: relative;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all .2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 56px;
+  overflow: hidden;
+}
+
+.so-serial-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(38, 208, 124, 0.4);
+  background: linear-gradient(135deg, rgba(38, 208, 124, 0.08) 0%, var(--surface2) 100%);
+  box-shadow: -6px 0 18px -4px var(--green-bright), 6px 0 18px -4px var(--green-bright);
+}
+
+.so-serial-card:hover .serial-val {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(38, 208, 124, 0.8);
+}
+
+.so-serial-card.staged {
+  background: rgba(17, 104, 82, 0.22);
+  border-color: var(--green-bright);
+  box-shadow: 0 0 14px rgba(38, 208, 124, 0.25);
+}
+
+.so-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.so-card-top .serial-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  transition: color .2s ease;
+}
+
+.so-card-top .indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-sub);
+}
+
+.so-serial-card.staged .indicator-dot {
+  background: var(--green-bright);
+  box-shadow: 0 0 6px var(--green-bright);
+}
+
+.so-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
+.so-serial-card.staged .so-card-bottom {
+  color: var(--green-bright);
+}
+
+/* Dispatch Staging Cart Card */
+.cart-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 7px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.cart-item-num-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--green);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+/* Track List Elements */
+.track-customer-banner {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+
+.track-banner-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.track-pills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.track-breakdown-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* Return Screen Layout */
+.return-screen-layout {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 16px;
+}
+
+/* Modal Overlay & Box */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-overlay.open {
+  display: flex;
+}
+
+.modal-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  animation: modalPop .18s ease-out;
+}
+
+@keyframes modalPop {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.modal-body {
+  padding: 18px 20px;
+}
+
+.modal-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-sub);
+  margin-bottom: 10px;
+  margin-top: 14px;
+}
+
+.modal-section-title:first-child {
+  margin-top: 0;
+}
+
+.modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Laser animation for scanner */
+@keyframes scanLaser {
+  0% { top: 6%; opacity: .8; }
+  50% { top: 92%; opacity: 1; }
+  100% { top: 6%; opacity: .8; }
+}
+
+.scan-laser-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--green-bright);
+  box-shadow: 0 0 10px var(--green-bright);
+  animation: scanLaser 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Toast Notifications */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--surface2);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  animation: toastIn .2s ease-out;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .stock-in-layout, .stockout-layout, .return-screen-layout {
+    grid-template-columns: 1fr;
+  }
+  .stockout-chips-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .model-cards-grid-4, .model-cards-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- TOP APP HEADER -->
+  <header>
+    <div class="brand" onclick="switchTab('stock-in')">
+      <div class="brand-icon">&#x25A6;</div>
+      <div class="brand-text">
+        <h1>AC Stock Tracker</h1>
+        <p>Fast, clean warehouse inventory</p>
+      </div>
+    </div>
+
+    <!-- Center Nav Tab Bar -->
+    <nav class="nav-tab-bar">
+      <button class="tab-btn" id="btn-tab-stock-in" onclick="switchTab('stock-in')">
+        Stock In
+      </button>
+      <button class="tab-btn" id="btn-tab-available" onclick="switchTab('available')">
+        Available Stock <span class="tab-badge" id="badge-available">123</span>
+      </button>
+      <button class="tab-btn active" id="btn-tab-stock-out" onclick="switchTab('stock-out')">
+        Stock Out <span class="tab-badge green-text" id="badge-cart">3</span>
+      </button>
+      <button class="tab-btn" id="btn-tab-track-list" onclick="switchTab('track-list')">
+        Track List <span class="tab-badge" id="badge-track">16</span>
+      </button>
+      <button class="tab-btn" id="btn-tab-return" onclick="switchTab('return')">
+        Return <span class="tab-badge" id="badge-return">2</span>
+      </button>
+    </nav>
+
+    <!-- Header Right Actions -->
+    <div class="header-actions">
+      <button class="model-pill-btn" onclick="openConfigModal()">
+        <span class="model-dot"></span>
+        <span id="header-model-label">Scan Model (Anthropic Claude &middot; claude-3-7-sonnet)</span>
+        <span style="font-size:13px; opacity:0.7;">&#9881;</span>
+      </button>
+      <!-- Day / Dark Toggle Switch -->
+      <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch Day (Light) / Night (Dark) mode">
+        <span class="theme-icon sun-icon">&#9728;</span>
+        <span class="theme-toggle-track">
+          <span class="theme-toggle-thumb"></span>
+        </span>
+        <span class="theme-icon moon-icon">&#9790;</span>
+        <span class="theme-mode-label" id="theme-mode-text">Dark</span>
+      </button>
+      <button class="icon-square-btn" onclick="downloadCurrentHtml()" title="Download Clean Single-File HTML">
+        &#11015;
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT -->
+  <main>
+
+    <!-- 1. STOCK IN SCREEN -->
+    <section id="view-stock-in" class="view-section">
+      <div class="stock-in-layout">
+        <!-- Left column: Image preview & Status log -->
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <!-- Image preview card -->
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Image Preview</span>
+            </div>
+            <div class="card-body">
+              <!-- Drag and Drop Image Uploader / Previewer -->
+              <input type="file" id="image-file-input" accept="image/*,.pdf" style="display:none;" onchange="handleFileSelected(event)">
+              <div class="image-preview-dropzone" id="image-dropzone" onclick="handleDropzoneClick(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" title="Click or Drag & Drop photo here">
+                <!-- Empty State -->
+                <div class="dropzone-empty-state" id="dropzone-empty-state">
+                  <div class="dropzone-icon-circle">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+                      <path d="M12 12v9"></path>
+                      <path d="m16 16-4-4-4 4"></path>
+                    </svg>
+                  </div>
+                  <div class="dropzone-title">Drag & Drop Photo to Scan</div>
+                  <div class="dropzone-sub">Drop aircon invoice, packing slip or parts photo here, or click to browse</div>
+                  <div class="dropzone-tags">
+                    <span class="dropzone-tag">JPG</span>
+                    <span class="dropzone-tag">PNG</span>
+                    <span class="dropzone-tag">WEBP</span>
+                    <span class="dropzone-tag">PDF</span>
+                  </div>
+                </div>
+
+                <!-- Loaded Image State -->
+                <div class="dropzone-preview-display" id="dropzone-preview-display">
+                  <div class="dropzone-file-bar" onclick="event.stopPropagation()">
+                    <div class="dropzone-file-info">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green-bright); flex-shrink:0;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                      </svg>
+                      <span id="preview-filename" style="font-weight:600;">photo_sample.jpg</span>
+                      <span id="preview-filesize" style="color:var(--text-sub); font-size:10px;">(240 KB)</span>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" onclick="clearPreview(event)" title="Remove photo" style="color:#f87171; padding:2px 8px; font-size:11px; height:24px;">
+                      &#10005; Remove
+                    </button>
+                  </div>
+                  <div class="dropzone-img-wrapper" id="dropzone-img-container">
+                    <div id="scan-laser" class="scan-laser-line" style="display:none;"></div>
+                    <img id="preview-photo-img" src="" alt="Photo to scan">
+                  </div>
+                </div>
+              </div>
+              <div class="preview-actions-row">
+                <button class="btn-preview-action" onclick="triggerLoadImage()" title="Load Photo File">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.9;">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                  </svg>
+                  <span>Load Image</span>
+                </button>
+                <button class="btn-preview-action btn-scan-main" id="btn-scan" onclick="triggerScanSimulation()" title="Extract serials with AI model">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                    <path d="m12 8 1.5 2.5L16 12l-2.5 1.5L12 16l-1.5-2.5L8 12l2.5-1.5z" fill="currentColor"></path>
+                  </svg>
+                  <span>SCAN</span>
+                </button>
+                <button class="btn-preview-action btn-clear" onclick="clearPreview(event)" title="Clear Photo Preview">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f87171;">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                  </svg>
+                  <span>Clear</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status Log card -->
+          <div class="card">
+            <div class="card-header" style="padding:10px 16px;">
+              <span class="card-title">Status Log</span>
+              <span style="font-size:11px; color:var(--text-sub);">Operational</span>
+            </div>
+            <div style="padding:12px 16px;">
+              <div class="status-log-console" id="status-log-console">
+                <div>[15:51:13] App initialized. Scan Engine ready.</div>
+                <div>[15:51:14] Ready: Drag &amp; drop or load an aircon invoice photo to begin scanning.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right column: Scan Results -->
+        <div class="card" style="display:flex; flex-direction:column;">
+          <div class="card-header">
+            <span class="card-title">Scan Results</span>
+            <div style="display:flex; gap:6px;">
+              <button class="btn-circle" onclick="addScanRowManual()" title="Add Model Row">+</button>
+              <button class="btn-circle" onclick="downloadScanCsv()" title="Export CSV">&#11015;</button>
+            </div>
+          </div>
+          <div class="scan-meta-bar">
+            <div>
+              <label class="form-label">SUPPLIER</label>
+              <input type="text" class="form-input" id="scan-supplier" placeholder="SUPPLIER">
+            </div>
+            <div>
+              <label class="form-label">DATE IN</label>
+              <input type="date" class="form-input" id="scan-date-in" value="2026-09-18">
+            </div>
+          </div>
+          <div class="table-container" style="flex:1;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:40px;">No</th>
+                  <th>Model <span id="scan-hdr-model-cnt" style="opacity:.6;">(5)</span></th>
+                  <th>Serial <span id="scan-hdr-serial-cnt" style="opacity:.6;">(12)</span></th>
+                  <th>Qty <span id="scan-hdr-qty-cnt" style="opacity:.6;">(12)</span></th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="scan-results-tbody"></tbody>
+            </table>
+          </div>
+          <div style="padding:14px 18px; border-top:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+            <span style="font-size:12px; color:var(--text-muted);" id="scan-summary-label">Total: 5 models &middot; 12 serialized units</span>
+            <button class="btn btn-primary" onclick="commitAllScansToStock()">Commit All to Available Stock &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. AVAILABLE STOCK SCREEN -->
+    <section id="view-available" class="view-section">
+      <div class="view-header">
+        <div>
+          <div class="view-title">Available Stock</div>
+          <div class="view-subtitle">Overview of all verified inventory serials by equipment model.</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px; color:var(--text-sub);">Total Units</div>
+          <div style="font-size:24px; font-weight:800; color:var(--green-bright);" class="mono">
+            <span id="avail-total-big">115</span> Units
+          </div>
+        </div>
+      </div>
+
+      <!-- Search & Brand Filter Pills -->
+      <div class="search-filter-bar">
+        <div class="search-box-wrap">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="avail-search" oninput="renderAvailable(this.value)" placeholder="Search serial (e.g., K002120) or model...">
+        </div>
+        <div class="filter-pills-row" id="avail-pills-row"></div>
+      </div>
+
+      <!-- Hierarchical Brand Sections Container -->
+      <div id="avail-accordion-container"></div>
+    </section>
+
+    <!-- 3. STOCK OUT & DISPATCH SCREEN -->
+    <section id="view-stock-out" class="view-section">
+      <div class="view-header">
+        <div>
+          <div class="view-title">Stock Out &amp; Dispatch</div>
+          <div class="view-subtitle">Stage serials for shipment, assign recipient details, and record dispatch.</div>
+        </div>
+        <div>
+          <button class="btn-danger-ghost" onclick="clearDispatchCart()">Clear Staging Cart</button>
+        </div>
+      </div>
+
+      <!-- Search & Brand Filter Bar -->
+      <div class="search-filter-bar">
+        <div class="search-box-wrap">
+          <span class="search-icon">&#128269;</span>
+          <input type="text" id="stockout-search" oninput="renderStockOut(this.value)" placeholder="Search Model, Serial or Date In...">
+        </div>
+        <div class="filter-pills-row" id="so-pills-row"></div>
+      </div>
+
+      <div class="stockout-layout">
+        <!-- Left: Accordion with 4-col chip cards -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-sub);">
+              AVAILABLE MODELS BY BRAND <span style="font-weight:400; text-transform:none; margin-left:6px; color:var(--text-muted);">Click serial chip to toggle in cart</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--green-bright);" id="so-staged-count-label">3 staged in active batch</div>
+          </div>
+          <div id="stockout-brands-container"></div>
+        </div>
+
+        <!-- Right: Dispatch Staging Cart -->
+        <div class="card" style="position:sticky; top:76px;">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Dispatch Staging Cart</div>
+              <div style="font-size:10.5px; color:var(--text-sub);">ID: #DISP-2026-0918</div>
+            </div>
+            <span class="badge badge-green" id="cart-pill-count">3 items</span>
+          </div>
+          <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+            <div id="cart-items-container" style="min-height:80px; max-height:260px; overflow-y:auto;"></div>
+            <div style="height:1px; background:var(--border);"></div>
+            <div>
+              <label class="form-label">Customer / Client Name *</label>
+              <input type="text" class="form-input" id="cart-customer" value="Neath Air Conditioning Ltd">
+            </div>
+            <div>
+              <label class="form-label">Date Out</label>
+              <input type="date" class="form-input" id="cart-date-out" value="2026-09-18">
+            </div>
+            <button class="btn btn-primary" style="justify-content:center; padding:10px;" onclick="processCartCheckout()">
+              Complete Checkout &amp; Deduct Stock
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. TRACK LIST SCREEN -->
+    <section id="view-track-list" class="view-section">
+      <div class="view-header">
+        <div>
+          <div class="view-title">Track List &amp; Records</div>
+          <div class="view-subtitle">Live movement log of stock deductions and fulfilled dispatches.</div>
+        </div>
+        <div>
+          <button class="btn btn-ghost btn-sm" onclick="exportTrackCsv()">&#11015; Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Customer Filter Pills -->
+      <div class="filter-pills-row" id="track-customer-pills" style="margin-bottom:14px;"></div>
+
+      <!-- Customer Summary Banner -->
+      <div class="track-customer-banner">
+        <div class="track-banner-top">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:var(--green-bright); display:inline-block;"></span>
+            <span style="font-weight:700; font-size:12px; letter-spacing:0.04em;" id="track-banner-title">CUSTOMER: ALL CUSTOMERS</span>
+            <span class="badge badge-green" id="track-banner-badge">16 Serials Total</span>
+          </div>
+          <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--green-bright);">
+            Real-time Dispatch Log
+          </div>
+        </div>
+        <div style="font-size:10.5px; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">
+          SOLD SERIAL BREAKDOWN &amp; EQUIPMENT TAG:
+        </div>
+        <div class="track-pills-wrap" id="track-breakdown-tags"></div>
+      </div>
+
+      <!-- Search Box -->
+      <div class="search-box-wrap" style="margin-bottom:14px;">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" id="track-search" oninput="renderTrackList(this.value)" placeholder="Search serial, customer, or model...">
+      </div>
+
+      <!-- Track List Table -->
+      <div class="card">
+        <div class="table-container table-scroll-10">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>MODEL</th>
+                <th>SERIAL NUMBER</th>
+                <th>DATE IN</th>
+                <th>DISPATCHED AT</th>
+                <th>CUSTOMER DESTINATION</th>
+                <th style="text-align:right;">STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="track-table-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. RETURN SCREEN -->
+    <section id="view-return" class="view-section">
+      <div class="return-screen-layout">
+        <!-- Left: Return form -->
+        <div class="card">
+          <div class="card-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:32px; height:32px; border-radius:8px; background:rgba(38,208,124,0.12); border:1px solid rgba(38,208,124,0.3); display:flex; align-items:center; justify-content:center; color:var(--green-bright); font-size:16px;">
+                &#8617;
+              </div>
+              <div>
+                <div class="card-title">Return &amp; RMA Inspection</div>
+                <div style="font-size:11px; color:var(--text-sub);">Inspect dispatched equipment and process return or restock</div>
+              </div>
+            </div>
+          </div>
+          <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+            <div>
+              <label class="form-label">Select Dispatched Serial</label>
+              <select class="form-select" id="rma-serial-select"></select>
+            </div>
+            <div>
+              <label class="form-label">Return Reason</label>
+              <select class="form-select" id="rma-reason">
+                <option>Defective / Failed Compressor</option>
+                <option>Excess Stock / Cancelled</option>
+                <option>Wrong Model Delivered</option>
+                <option>Customer Exchange</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Physical Condition</label>
+              <select class="form-select" id="rma-condition">
+                <option>Like New / Unopened Packaging</option>
+                <option>Opened - Tested Operational</option>
+                <option>Damaged Casing / Minor Cosmetic</option>
+                <option>Inoperative / Requires Service</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Inspection Notes</label>
+              <textarea class="form-textarea" id="rma-notes" placeholder="Notes on physical condition..."></textarea>
+            </div>
+            <div style="display:flex; gap:10px; padding-top:6px;">
+              <button class="btn btn-primary" style="flex:1; justify-content:center;" onclick="submitRmaAction(true)">
+                &#8634; Restock to Available
+              </button>
+              <button class="btn" style="flex:1; justify-content:center; background:#1c2730; color:#e6edf2; border:1px solid #2e3d48;" onclick="submitRmaAction(false)">
+                &#128274; Quarantine / Audit
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Processed Returns Registry Table -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Processed Returns Registry</div>
+              <div style="font-size:11px; color:var(--text-sub);">Audit trail of equipment returns and warehouse dispositions</div>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Serial</th>
+                  <th>Model</th>
+                  <th>Customer</th>
+                  <th>Reason</th>
+                  <th>Action Taken</th>
+                  <th style="text-align:right;">Date</th>
+                </tr>
+              </thead>
+              <tbody id="rma-table-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- 6. MODEL AND API CONFIGURATION MODAL -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Model &amp; API Configuration</div>
+        <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">Configure engine routing and active secure credentials.</div>
+      </div>
+      <button class="btn-circle" onclick="closeConfigModal()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section-title">01 / ENGINE ROUTER</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        <div>
+          <label class="form-label">AI Provider</label>
+          <select class="form-select" id="cfg-provider" onchange="updateModelOptions(this.value)">
+            <option value="gemini">Gemini</option>
+            <option value="alibaba">Alibaba Qwen-VL</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Model Selection</label>
+          <select class="form-select" id="cfg-model" onchange="updateRoutingPreview()">
+            <option>claude-3-7-sonnet</option>
+            <option>claude-3-5-sonnet</option>
+            <option>claude-3-haiku</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span class="modal-section-title" style="margin:0;">02 / API KEY CREDENTIALS</span>
+        <span style="font-size:11px; color:var(--text-sub);" id="cfg-keys-count-label">2 keys registered</span>
+      </div>
+      <div style="border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:16px;">
+        <table class="data-table" style="font-size:11.5px;">
+          <thead>
+            <tr><th>PROVIDER</th><th>KEY SIGNATURE</th><th>STATUS</th><th>REMARK</th><th style="text-align:right;">ACTIONS</th></tr>
+          </thead>
+          <tbody id="cfg-keys-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="modal-section-title">ADD NEW CONFIGURATION KEY</div>
+      <div style="display:grid; grid-template-columns:1fr 140px auto; gap:8px;">
+        <input type="text" class="form-input" id="cfg-new-key" placeholder="Enter Gemini API key">
+        <input type="text" class="form-input" id="cfg-new-remark" placeholder="e.g. Field Team">
+        <button class="btn btn-primary" onclick="addNewKey()">+ Register</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div style="font-size:11px; color:var(--text-sub);">
+        Routing: <span id="cfg-routing-preview" style="color:var(--text);">Gemini &middot; claude-3-7-sonnet</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" onclick="closeConfigModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="applyConfigSettings()">&#10003; Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN BRAND MODAL (new model -> brand) -->
+<div class="modal-overlay" id="brand-modal">
+  <div class="modal-dialog" style="max-width:420px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Assign Brand</div>
+        <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">New model <span id="brand-modal-model" class="mono" style="color:var(--green-bright);"></span> needs a brand.</div>
+      </div>
+      <button class="btn-circle" onclick="closeBrandModal(true)">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section-title">EXISTING BRANDS</div>
+      <select class="form-select" id="brand-select" style="margin-bottom:14px;"></select>
+      <div class="modal-section-title">OR NEW BRAND</div>
+      <input type="text" class="form-input" id="brand-new" placeholder="e.g. MITSUBISHI">
+    </div>
+    <div class="modal-footer">
+      <div style="font-size:11px; color:var(--text-sub);">Model &rarr; Brand mapping is remembered.</div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" onclick="closeBrandModal(true)">Cancel</button>
+        <button class="btn btn-primary" onclick="closeBrandModal(false)">&#10003; Assign</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container"></div>
+
+<script>
+/* =========================================================
+   APPLICATION STATE — hydrated from the Python backend
+   ========================================================= */
+const DB = {
+  activeTab: 'stock-in',
+  availFilter: 'ALL',
+  soFilter: 'ALL',
+  trackFilter: 'ALL',
+  scans: [],        // filled by POST /api/scan or the manual + button
+  inventory: {},    // GET /api/inventory  (brand -> models -> serials)
+  stagedCart: [],   // client-side staging; POST /api/stock-out on checkout
+  trackList: [],    // GET /api/track       (sold units)
+  returns: [],      // GET /api/returns
+  brands: [],       // from /api/inventory
+  photoFile: null,  // File picked for scanning
+  config: null,     // GET /api/config      (active provider/model)
+};
+
+/* ---------------- backend API helpers ---------------- */
+async function api(path, opts = {}) {
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const apiGet = p => api(p);
+const apiPost = (p, body) => api(p, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body)
+});
+const apiDel = (p, body) => api(p, {
+  method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body || {})
+});
+
+async function refreshData() {
+  const [inv, trk, ret] = await Promise.all([
+    apiGet('/api/inventory'), apiGet('/api/track'), apiGet('/api/returns')
+  ]);
+  DB.inventory = inv.inventory;
+  DB.brands = inv.brands;
+  DB.trackList = trk.records;
+  DB.returns = ret.records;
+  renderBrandPills();
+  renderAll();
+  updateGlobalBadges();
+}
+
+function renderAll() {
+  renderScanResultsTable();
+  renderAvailable();
+  renderStockOut();
+  renderCartSidebar();
+  renderTrackList();
+  renderReturnScreen();
+}
+
+function logLine(txt, cls = '') {
+  const log = document.getElementById('status-log-console');
+  if (!log) return;
+  const el = document.createElement('div');
+  if (cls) el.className = cls;
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${txt}`;
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+/* =========================================================
+   CORE HELPERS
+   ========================================================= */
+function showToast(msg, icon = '&#10003;') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = '<span style="color:var(--green-bright);">' + icon + '</span><span>' + msg + '</span>';
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transition = 'opacity .25s';
+    setTimeout(() => t.remove(), 250);
+  }, 2800);
+}
+
+function countBrandUnits(brandKey) {
+  const b = DB.inventory[brandKey];
+  if (!b) return 0;
+  let cnt = 0;
+  for (const m in b.models) cnt += b.models[m].serials.length;
+  return cnt;
+}
+
+function countTotalUnits() {
+  let cnt = 0;
+  for (const b in DB.inventory) cnt += countBrandUnits(b);
+  return cnt;
+}
+
+function isSerialInCart(s) {
+  return DB.stagedCart.some(i => i.serial === s);
+}
+
+function updateGlobalBadges() {
+  const setTxt = (id, v) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = v;
+  };
+  const tot = countTotalUnits();
+  setTxt('badge-available', tot);
+  setTxt('avail-total-big', tot);
+  setTxt('avail-cnt-all', tot);
+  setTxt('so-cnt-all', tot);
+  for (const b in DB.inventory) {
+    setTxt('avail-cnt-' + b.toLowerCase(), countBrandUnits(b));
+    setTxt('so-cnt-' + b.toLowerCase(), countBrandUnits(b));
+  }
+  setTxt('badge-cart', DB.stagedCart.length);
+  setTxt('cart-pill-count', DB.stagedCart.length + ' items');
+  setTxt('so-staged-count-label', DB.stagedCart.length + ' staged in active batch');
+  setTxt('badge-track', DB.trackList.length);
+  setTxt('badge-return', DB.returns.length);
+}
+
+/* Dynamic brand pills — rendered from the backend's brand list */
+function renderBrandPills() {
+  const mk = (prefix, current, setter) => {
+    const row = document.getElementById(prefix + '-pills-row');
+    if (!row) return;
+    row.innerHTML = '';
+    const mkBtn = (name, inner) => {
+      const b = document.createElement('button');
+      b.className = 'pill-filter-btn' + (current === name ? ' active' : '');
+      b.innerHTML = inner;
+      b.onclick = () => setter(name);
+      row.appendChild(b);
+    };
+    mkBtn('ALL', `All (<span id="${prefix}-cnt-all">0</span>)`);
+    DB.brands.forEach(b => {
+      mkBtn(b, `${b} (<span id="${prefix}-cnt-${b.toLowerCase()}">0</span>)`);
+    });
+  };
+  mk('avail', DB.availFilter, setAvailFilter);
+  mk('so', DB.soFilter, setSOFilter);
+}
+
+/* =========================================================
+   TAB SWITCHING
+   ========================================================= */
+function switchTab(tab) {
+  DB.activeTab = tab;
+  ['stock-in', 'available', 'stock-out', 'track-list', 'return'].forEach(t => {
+    const view = document.getElementById('view-' + t);
+    const btn = document.getElementById('btn-tab-' + t);
+    if (view) view.classList.toggle('active', t === tab);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+
+  if (tab === 'stock-in') renderScanResultsTable();
+  if (tab === 'available') renderAvailable();
+  if (tab === 'stock-out') renderStockOut();
+  if (tab === 'track-list') renderTrackList();
+  if (tab === 'return') renderReturnScreen();
+
+  updateGlobalBadges();
+}
+
+/* =========================================================
+   1. STOCK IN SCREEN LOGIC
+   ========================================================= */
+function renderScanResultsTable() {
+  const tbody = document.getElementById('scan-results-tbody');
+  tbody.innerHTML = '';
+  
+  let totalSerials = 0;
+  DB.scans.forEach((row, idx) => {
+    totalSerials += row.serials.length;
+    const serialChips = row.serials.length
+      ? row.serials.map(s => '<span class="scan-serial-badge">' + s + '</span>').join(' ')
+      : '<span style="color:var(--text-muted); font-size:10.5px;">' + (row.desc || 'no serials') + '</span>';
+    const flagIcon = row.flag
+      ? ' <span title="' + row.flag + '" style="color:var(--amber, #f0b429); cursor:help;">&#9888;</span>'
+      : '';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono" style="color:var(--text-sub);">${row.no}</td>
+      <td style="font-weight:700;">${row.model || '<span style="color:var(--text-muted);">\u2014</span>'}</td>
+      <td>${serialChips}${flagIcon}</td>
+      <td style="color:var(--text-muted);">${row.qty}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-ghost btn-sm" onclick="editScanRow(${idx})" title="Edit Row" style="margin-right:4px;">&#9998;</button>
+        <button class="btn btn-primary btn-sm" onclick="commitScanRow(${idx})" title="Commit to Inventory">&#9654;</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('scan-hdr-model-cnt').textContent = '(' + DB.scans.length + ')';
+  document.getElementById('scan-hdr-serial-cnt').textContent = '(' + totalSerials + ')';
+  document.getElementById('scan-hdr-qty-cnt').textContent = '(' + totalSerials + ')';
+  document.getElementById('scan-summary-label').textContent = 'Total: ' + DB.scans.length + ' models \u00b7 ' + totalSerials + ' serialized units';
+}
+
+function handleDropzoneClick(e) {
+  if (e && (e.target.closest('button') || e.target.closest('.dropzone-file-bar'))) return;
+  const input = document.getElementById('image-file-input');
+  if (input) input.click();
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('image-dropzone');
+  if (dz) dz.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('image-dropzone');
+  if (dz) dz.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = document.getElementById('image-dropzone');
+  if (dz) dz.classList.remove('dragover');
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+    processLoadedPhoto(e.dataTransfer.files[0]);
+  }
+}
+
+function handleFileSelected(e) {
+  if (e.target && e.target.files && e.target.files[0]) {
+    processLoadedPhoto(e.target.files[0]);
+  }
+}
+
+function processLoadedPhoto(file) {
+  if (!file) return;
+  DB.photoFile = file;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = document.getElementById('preview-photo-img');
+    const filename = document.getElementById('preview-filename');
+    const filesize = document.getElementById('preview-filesize');
+    const emptyState = document.getElementById('dropzone-empty-state');
+    const previewDisplay = document.getElementById('dropzone-preview-display');
+
+    if (img) img.src = evt.target.result;
+    if (filename) filename.textContent = file.name;
+
+    const sizeStr = file.size > 1048576
+      ? (file.size / 1048576).toFixed(1) + ' MB'
+      : Math.max(1, Math.round(file.size / 1024)) + ' KB';
+    if (filesize) filesize.textContent = '(' + sizeStr + ')';
+
+    if (emptyState) emptyState.style.display = 'none';
+    if (previewDisplay) previewDisplay.style.display = 'flex';
+
+    const log = document.getElementById('status-log-console');
+    if (log) {
+      const d = document.createElement('div');
+      d.className = 'log-line-ok';
+      d.textContent = `[${new Date().toLocaleTimeString()}] Photo loaded: ${file.name} (${sizeStr})`;
+      log.appendChild(d);
+      log.scrollTop = log.scrollHeight;
+    }
+    showToast(`Loaded: ${file.name}`, '&#128247;');
+  };
+  reader.readAsDataURL(file);
+}
+
+function triggerLoadImage() {
+  const input = document.getElementById('image-file-input');
+  if (input) input.click();
+}
+
+function clearPreview(e) {
+  if (e) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+  const img = document.getElementById('preview-photo-img');
+  const input = document.getElementById('image-file-input');
+  const emptyState = document.getElementById('dropzone-empty-state');
+  const previewDisplay = document.getElementById('dropzone-preview-display');
+
+  if (img) img.src = '';
+  if (input) input.value = '';
+  if (previewDisplay) previewDisplay.style.display = 'none';
+  if (emptyState) emptyState.style.display = 'flex';
+  DB.photoFile = null;
+
+  const log = document.getElementById('status-log-console');
+  if (log) {
+    const d = document.createElement('div');
+    d.style.color = 'var(--text-sub)';
+    d.textContent = `[${new Date().toLocaleTimeString()}] Preview cleared. Ready for new photo.`;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+  }
+  showToast('Preview cleared.');
+}
+
+async function triggerScanSimulation() {
+  const laser = document.getElementById('scan-laser');
+  const btn = document.getElementById('btn-scan');
+  const log = document.getElementById('status-log-console');
+
+  const scanSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="m12 8 1.5 2.5L16 12l-2.5 1.5L12 16l-1.5-2.5L8 12l2.5-1.5z" fill="currentColor"></path></svg>`;
+
+  const addLog = (txt, cls = '') => {
+    const el = document.createElement('div');
+    if (cls) el.className = cls;
+    el.textContent = txt;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+  };
+
+  if (!DB.photoFile) {
+    addLog(`[${new Date().toLocaleTimeString()}] Load a photo first.`, 'log-line-warn');
+    showToast('Load a photo first.');
+    return;
+  }
+
+  laser.style.display = 'block';
+  btn.disabled = true;
+  btn.innerHTML = `${scanSvg}<span>Scanning...</span>`;
+  const modelName = (DB.config && DB.config.active)
+    ? `${provLabel(DB.config.active.provider)} \u00b7 ${DB.config.active.model}`
+    : 'AI Vision';
+  addLog(`[${new Date().toLocaleTimeString()}] Scan button clicked \u2014 sending image to ${modelName}, waiting for response...`, 'log-line-active');
+
+  try {
+    const fd = new FormData();
+    fd.append('file', DB.photoFile);
+    const res = await api('/api/scan', { method: 'POST', body: fd });
+    (res.log || []).forEach(l => addLog(`[${new Date().toLocaleTimeString()}] ${l}`, res.ok ? 'log-line-ok' : 'log-line-warn'));
+    if (res.ok) {
+      DB.scans = res.rows.map(r => ({
+        no: r.no, model: r.model, serials: r.serials,
+        qty: r.qty, flag: r.flag || '', desc: r.desc || ''
+      }));
+      renderScanResultsTable();
+      showToast(`Scan complete! ${res.rows.length} rows extracted.`);
+    } else {
+      showToast('Scan failed \u2014 see Status Log.');
+    }
+  } catch (e) {
+    addLog(`[${new Date().toLocaleTimeString()}] Scan request failed: ${e.message}`, 'log-line-warn');
+    showToast('Scan failed \u2014 is backend.py running?');
+  }
+
+  laser.style.display = 'none';
+  btn.disabled = false;
+  btn.innerHTML = `${scanSvg}<span>SCAN</span>`;
+}
+
+function editScanRow(idx) {
+  const row = DB.scans[idx];
+  const input = prompt('Edit serials for ' + row.model + ' (comma-separated):', row.serials.join(', '));
+  if (input !== null) {
+    row.serials = input.split(',').map(s => s.trim()).filter(Boolean);
+    row.qty = row.serials.length + ' PC' + (row.serials.length > 1 ? 'S' : '');
+    renderScanResultsTable();
+    showToast('Updated ' + row.model);
+  }
+}
+
+function addScanRowManual() {
+  const model = (prompt('Model code:') || '').trim().toUpperCase();
+  if (!model) return;
+  const serials = (prompt('Serials (comma-separated):') || '')
+    .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  const no = (DB.scans.length + 1) * 10;
+  DB.scans.push({ no, model, serials, qty: serials.length + ' PC' + (serials.length > 1 ? 'S' : ''), flag: '', desc: '' });
+  renderScanResultsTable();
+  showToast('Added manual row ' + model);
+}
+
+/* ---- real commit: scan row -> backend stock_in (dup check + brand modal) ---- */
+function scanBatchFields() {
+  const s = document.getElementById('scan-supplier');
+  const d = document.getElementById('scan-date-in');
+  return {
+    supplier: (s && s.value.trim()) || 'Unknown Supplier',
+    date_in: (d && d.value) || new Date().toISOString().slice(0, 10)
+  };
+}
+
+function reportCommit(row, res) {
+  if (res.added.length) {
+    showToast(`ADDED ${res.added.length} unit(s) of ${row.model}.`);
+    logLine(`Committed ${row.model}: ${res.added.join(', ')}`, 'log-line-ok');
+  }
+  if (res.dupes.length) {
+    showToast(`DUPLICATED SERIAL(S): ${res.dupes.join(', ')}`, '&#9888;');
+    logLine(`Skipped duplicates: ${res.dupes.join(', ')}`, 'log-line-warn');
+  }
+}
+
+async function commitScanRow(idx) {
+  const row = DB.scans[idx];
+  if (!row) return;
+  if (!row.serials.length) {
+    showToast('Row has no serials \u2014 edit it first.');
+    return;
+  }
+  if (!row.model) {
+    showToast('Row has no model \u2014 edit it first.');
+    return;
+  }
+  try {
+    const res = await apiPost('/api/stock-in', {
+      ...scanBatchFields(), model: row.model, serials: row.serials
+    });
+    if (res.needs_brand) {
+      const brand = await askBrand(row.model);
+      if (!brand) return;  // cancelled \u2014 row stays in the list
+      return commitScanRow(idx);  // retry now that the model is mapped
+    }
+    reportCommit(row, res);
+    DB.scans.splice(idx, 1);
+    renderScanResultsTable();
+    await refreshData();
+  } catch (e) {
+    showToast('Commit failed: ' + e.message);
+  }
+}
+
+async function commitAllScansToStock() {
+  if (!DB.scans.length) {
+    showToast('No scanned rows to commit.');
+    return;
+  }
+  let done = 0, skipped = 0;
+  let i = 0;
+  while (i < DB.scans.length) {
+    const row = DB.scans[i];
+    if (!row.serials.length || !row.model) { skipped++; i++; continue; }
+    try {
+      const res = await apiPost('/api/stock-in', {
+        ...scanBatchFields(), model: row.model, serials: row.serials
+      });
+      if (res.needs_brand) {
+        const brand = await askBrand(row.model);
+        if (!brand) { skipped++; i++; continue; }
+        continue;  // retry the same row
+      }
+      reportCommit(row, res);
+      DB.scans.splice(i, 1);
+      renderScanResultsTable();
+      done++;
+    } catch (e) {
+      showToast(`Row ${row.no || i + 1} failed: ${e.message}`);
+      skipped++; i++;
+    }
+  }
+  await refreshData();
+  showToast(`Committed ${done} row(s)` + (skipped ? `, skipped ${skipped}` : '') + '.');
+}
+
+/* ---- Assign Brand modal (new model encountered during commit) ---- */
+let _brandResolve = null;
+function askBrand(model) {
+  return new Promise(resolve => {
+    _brandResolve = resolve;
+    document.getElementById('brand-modal-model').textContent = model;
+    const sel = document.getElementById('brand-select');
+    sel.innerHTML = DB.brands.length
+      ? DB.brands.map(b => `<option value="${b}">${b}</option>`).join('')
+      : '<option value="">\u2014 no brands yet \u2014</option>';
+    document.getElementById('brand-new').value = '';
+    document.getElementById('brand-modal').classList.add('open');
+  });
+}
+
+async function closeBrandModal(cancelled) {
+  document.getElementById('brand-modal').classList.remove('open');
+  const resolve = _brandResolve;
+  _brandResolve = null;
+  if (!resolve) return;
+  if (cancelled) return resolve(null);
+  const model = document.getElementById('brand-modal-model').textContent;
+  const fresh = document.getElementById('brand-new').value.trim().toUpperCase();
+  const picked = fresh || document.getElementById('brand-select').value;
+  if (!picked) {
+    showToast('Pick or create a brand.');
+    return resolve(null);
+  }
+  try {
+    await apiPost('/api/models/brand', { model, brand: picked });
+  } catch (e) {
+    showToast('Assign failed: ' + e.message);
+    return resolve(null);
+  }
+  if (!DB.brands.includes(picked)) {
+    DB.brands.push(picked);
+    renderBrandPills();
+    updateGlobalBadges();
+  }
+  resolve(picked);
+}
+
+
+
+function downloadScanCsv() {
+  let csv = 'No,Model,Serials,Qty\n';
+  DB.scans.forEach(r => csv += `${r.no},"${r.model}","${r.serials.join(';')}",${r.qty}\n`);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'scan_results.csv';
+  a.click();
+  showToast('Exported scan_results.csv');
+}
+
+/* =========================================================
+   2. AVAILABLE STOCK LOGIC
+   ========================================================= */
+function copySerial(s) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(s).then(() => {
+      showToast('Copied ' + s + ' to clipboard!', '&#x1F4CB;');
+    }).catch(() => {
+      showToast('Selected: ' + s, '&#10003;');
+    });
+  } else {
+    showToast('Selected: ' + s, '&#10003;');
+  }
+}
+
+function setAvailFilter(filter) {
+  DB.availFilter = filter;
+  renderBrandPills();
+  updateGlobalBadges();
+  renderAvailable();
+}
+
+function renderAvailable(searchTerm = '') {
+  const container = document.getElementById('avail-accordion-container');
+  container.innerHTML = '';
+
+  const q = searchTerm.trim().toLowerCase();
+  const brands = DB.availFilter === 'ALL' ? Object.keys(DB.inventory) : [DB.availFilter].filter(b => DB.inventory[b]);
+
+  brands.forEach(brandKey => {
+    const bData = DB.inventory[brandKey];
+    const brandUnits = countBrandUnits(brandKey);
+
+    let modelsHtml = '';
+    for (const mKey in bData.models) {
+      const mData = bData.models[mKey];
+      let serials = mData.serials;
+      if (q) {
+        serials = serials.filter(s => s.toLowerCase().includes(q) || mKey.toLowerCase().includes(q));
+        if (serials.length === 0) continue;
+      }
+
+      const cardsHtml = serials.map(s => {
+        const staged = isSerialInCart(s);
+        return `
+          <div class="avail-unit-card group relative overflow-hidden ${staged ? 'staged' : ''}" onclick="copySerial('${s}')" title="Click to copy serial">
+            <span class="card-glow-bar-left"></span>
+            <span class="card-glow-bar-right"></span>
+            <div class="avail-card-header">
+              <span class="serial-text">${s}</span>
+              <span class="avail-card-dot" style="${staged ? 'background:var(--green-bright);box-shadow:0 0 8px var(--green-bright);' : ''}"></span>
+            </div>
+            <div class="meta-text">
+              <span>Rec: ${mData.dateIn}</span>
+              <span class="avail-card-tag">${staged ? 'Staged &#10003;' : 'In Stock'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      modelsHtml += `
+        <div class="model-accordion">
+          <div class="model-accordion-header" onclick="toggleModelAcc('${brandKey}', '${mKey}')">
+            <div style="display:flex; align-items:center;">
+              <span class="model-index-pill">${mData.idx || '01'}</span>
+              <span style="font-weight:700; font-size:12.5px;">${mKey}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge badge-green">${serials.length} In Stock</span>
+              <span style="color:var(--text-sub);">${mData.open ? '&#9650;' : '&#9660;'}</span>
+            </div>
+          </div>
+          <div style="display:${mData.open ? 'grid' : 'none'};" class="model-cards-grid-4">
+            ${cardsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    if (!modelsHtml && q) return;
+
+    const brandSection = document.createElement('div');
+    brandSection.className = 'brand-accordion';
+    brandSection.innerHTML = `
+      <div class="brand-accordion-header" onclick="toggleBrandAcc('${brandKey}')">
+        <div class="brand-title-group">
+          <span class="brand-color-dot" style="background:${bData.color};"></span>
+          <span style="font-weight:700; font-size:12px; letter-spacing:0.04em;">${brandKey} INVENTORY</span>
+          <span class="badge badge-neutral">${brandUnits} Units Total</span>
+        </div>
+        <span style="color:var(--text-sub); font-size:12px;">${bData.open ? '&#9650;' : '&#9660;'}</span>
+      </div>
+      <div style="padding:12px; display:${bData.open ? 'block' : 'none'};">
+        ${modelsHtml}
+      </div>
+    `;
+    container.appendChild(brandSection);
+  });
+}
+
+function toggleBrandAcc(brand) {
+  if (DB.inventory[brand]) {
+    DB.inventory[brand].open = !DB.inventory[brand].open;
+    renderAvailable();
+  }
+}
+
+function toggleModelAcc(brand, model) {
+  if (DB.inventory[brand] && DB.inventory[brand].models[model]) {
+    DB.inventory[brand].models[model].open = !DB.inventory[brand].models[model].open;
+    renderAvailable();
+  }
+}
+
+/* =========================================================
+   3. STOCK OUT & DISPATCH LOGIC
+   ========================================================= */
+function setSOFilter(filter) {
+  DB.soFilter = filter;
+  renderBrandPills();
+  updateGlobalBadges();
+  renderStockOut();
+}
+
+function renderStockOut(searchTerm = '') {
+  const container = document.getElementById('stockout-brands-container');
+  container.innerHTML = '';
+
+  const q = searchTerm.trim().toLowerCase();
+  const brands = DB.soFilter === 'ALL' ? Object.keys(DB.inventory) : [DB.soFilter].filter(b => DB.inventory[b]);
+
+  brands.forEach(brandKey => {
+    const bData = DB.inventory[brandKey];
+    const brandUnits = countBrandUnits(brandKey);
+
+    let modelsHtml = '';
+    for (const mKey in bData.models) {
+      const mData = bData.models[mKey];
+      let serials = mData.serials;
+      if (q) {
+        serials = serials.filter(s => s.toLowerCase().includes(q) || mKey.toLowerCase().includes(q));
+        if (serials.length === 0) continue;
+      }
+
+      const chipsHtml = serials.map(s => {
+        const staged = isSerialInCart(s);
+        return `
+          <div class="so-serial-card group relative overflow-hidden ${staged ? 'staged' : ''}" onclick="toggleSerialInCart('${s}', '${mKey}', '${brandKey}')">
+            <span class="card-glow-bar-left"></span>
+            <span class="card-glow-bar-right"></span>
+            <div class="so-card-top">
+              <span class="serial-val">${s}</span>
+              <span class="indicator-dot"></span>
+            </div>
+            <div class="so-card-bottom">
+              <span>In: ${mData.dateIn}</span>
+              <span>${staged ? 'Staged &#10003;' : 'Ready'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      modelsHtml += `
+        <div class="model-accordion">
+          <div class="model-accordion-header" onclick="toggleSOModelAcc('${brandKey}', '${mKey}')">
+            <div style="display:flex; align-items:center;">
+              <span class="model-index-pill">${mData.idx || '01'}</span>
+              <span style="font-weight:700; font-size:12.5px;">${mKey}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="badge badge-green">${serials.length} In Stock</span>
+              <span style="color:var(--text-sub);">${mData.open ? '&#9650;' : '&#9660;'}</span>
+            </div>
+          </div>
+          <div style="display:${mData.open ? 'block' : 'none'};">
+            <div style="padding:8px 14px 0 14px; font-size:11px; color:var(--text-sub);">
+              Click any serial to quickly toggle in Dispatch Staging Cart:
+            </div>
+            <div class="stockout-chips-grid">
+              ${chipsHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (!modelsHtml && q) return;
+
+    const brandSection = document.createElement('div');
+    brandSection.className = 'brand-accordion';
+    brandSection.innerHTML = `
+      <div class="brand-accordion-header" onclick="toggleSOBrandAcc('${brandKey}')">
+        <div class="brand-title-group">
+          <span class="brand-color-dot" style="background:${bData.color};"></span>
+          <span style="font-weight:700; font-size:12px; letter-spacing:0.04em;">${brandKey} INVENTORY</span>
+          <span class="badge badge-neutral">${brandUnits} Units Total</span>
+        </div>
+        <span style="color:var(--text-sub); font-size:12px;">${bData.open ? '&#9650;' : '&#9660;'}</span>
+      </div>
+      <div style="padding:12px; display:${bData.open ? 'block' : 'none'};">
+        ${modelsHtml}
+      </div>
+    `;
+    container.appendChild(brandSection);
+  });
+
+  renderCartSidebar();
+}
+
+function toggleSOBrandAcc(brand) {
+  if (DB.inventory[brand]) {
+    DB.inventory[brand].open = !DB.inventory[brand].open;
+    renderStockOut();
+  }
+}
+
+function toggleSOModelAcc(brand, model) {
+  if (DB.inventory[brand] && DB.inventory[brand].models[model]) {
+    DB.inventory[brand].models[model].open = !DB.inventory[brand].models[model].open;
+    renderStockOut();
+  }
+}
+
+function toggleSerialInCart(serial, model, brand) {
+  const existingIdx = DB.stagedCart.findIndex(x => x.serial === serial);
+  if (existingIdx !== -1) {
+    DB.stagedCart.splice(existingIdx, 1);
+    showToast('Removed ' + serial + ' from staging cart.');
+  } else {
+    DB.stagedCart.push({ serial, model, brand });
+    showToast('Staged ' + serial + ' &#8594; ' + model);
+  }
+  updateGlobalBadges();
+  renderStockOut();
+  if (DB.activeTab === 'available') renderAvailable();
+}
+
+function renderCartSidebar() {
+  const container = document.getElementById('cart-items-container');
+  container.innerHTML = '';
+
+  if (DB.stagedCart.length === 0) {
+    container.innerHTML = '<div style="font-size:11.5px; color:var(--text-sub); text-align:center; padding:24px 0;">Cart is empty. Select serials from the left list.</div>';
+    return;
+  }
+
+  DB.stagedCart.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'cart-card-item';
+    div.innerHTML = `
+      <div style="display:flex; align-items:center;">
+        <div class="cart-item-num-box">${idx + 1}</div>
+        <div>
+          <div class="mono" style="font-weight:700; font-size:12px;">${item.serial}</div>
+          <div style="font-size:11px; color:var(--text-sub);">${item.model}</div>
+        </div>
+      </div>
+      <button style="background:none; border:none; color:var(--text-sub); cursor:pointer; font-size:14px;" onclick="removeFromCart(${idx})" title="Remove item">&#10005;</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function removeFromCart(idx) {
+  const item = DB.stagedCart[idx];
+  DB.stagedCart.splice(idx, 1);
+  showToast('Removed ' + item.serial);
+  updateGlobalBadges();
+  renderStockOut();
+}
+
+function clearDispatchCart() {
+  DB.stagedCart = [];
+  updateGlobalBadges();
+  renderStockOut();
+  showToast('Staging cart cleared.');
+}
+
+async function processCartCheckout() {
+  if (DB.stagedCart.length === 0) {
+    showToast('Staging cart is empty.');
+    return;
+  }
+  const cust = document.getElementById('cart-customer').value.trim() || 'Customer';
+  const dateOut = document.getElementById('cart-date-out').value
+    || new Date().toISOString().slice(0, 10);
+  try {
+    const res = await apiPost('/api/stock-out', {
+      serials: DB.stagedCart.map(i => i.serial),
+      customer: cust, date_out: dateOut
+    });
+    showToast(`Successfully dispatched ${res.sold.length} serials to ${cust}!`);
+    DB.stagedCart = [];
+    await refreshData();
+  } catch (e) {
+    showToast('Checkout failed: ' + e.message);
+  }
+}
+
+/* =========================================================
+   4. TRACK LIST LOGIC
+   ========================================================= */
+function renderTrackList(searchTerm = '') {
+  renderCustomerFilterPills();
+
+  const q = searchTerm.trim().toLowerCase();
+  let list = DB.trackList;
+
+  if (DB.trackFilter !== 'ALL') {
+    list = list.filter(r => r.customer === DB.trackFilter);
+  }
+
+  if (q) {
+    list = list.filter(r => 
+      r.serial.toLowerCase().includes(q) ||
+      r.model.toLowerCase().includes(q) ||
+      r.customer.toLowerCase().includes(q)
+    );
+  }
+
+  // Update banner
+  const bannerTitle = document.getElementById('track-banner-title');
+  bannerTitle.textContent = 'CUSTOMER: ' + (DB.trackFilter === 'ALL' ? 'ALL CUSTOMERS' : DB.trackFilter.toUpperCase());
+  document.getElementById('track-banner-badge').textContent = list.length + ' Serials Total';
+
+  const breakdownContainer = document.getElementById('track-breakdown-tags');
+  breakdownContainer.innerHTML = '';
+  list.forEach(r => {
+    const chip = document.createElement('span');
+    chip.className = 'track-breakdown-chip';
+    chip.textContent = `${r.serial} (${r.model})`;
+    breakdownContainer.appendChild(chip);
+  });
+
+  const tbody = document.getElementById('track-table-tbody');
+  tbody.innerHTML = '';
+
+  list.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:700;">${r.model}</td>
+      <td class="mono" style="color:var(--green-bright); font-weight:700;">${r.serial}</td>
+      <td class="mono" style="color:var(--text-muted);">${r.dateIn}</td>
+      <td class="mono" style="color:var(--text-muted);">${r.dateOut}</td>
+      <td style="font-weight:500;">${r.customer}</td>
+      <td style="text-align:right;">
+        <span class="badge badge-green">Dispatched</span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCustomerFilterPills() {
+  const container = document.getElementById('track-customer-pills');
+  container.innerHTML = '';
+
+  const custMap = {};
+  DB.trackList.forEach(r => {
+    custMap[r.customer] = (custMap[r.customer] || 0) + 1;
+  });
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'pill-filter-btn' + (DB.trackFilter === 'ALL' ? ' active' : '');
+  allBtn.innerHTML = 'All Customers <span class="tab-badge">' + DB.trackList.length + '</span>';
+  allBtn.onclick = () => { DB.trackFilter = 'ALL'; renderTrackList(); };
+  container.appendChild(allBtn);
+
+  for (const cName in custMap) {
+    const btn = document.createElement('button');
+    btn.className = 'pill-filter-btn' + (DB.trackFilter === cName ? ' active' : '');
+    btn.innerHTML = `${cName} <span class="tab-badge">${custMap[cName]} units</span>`;
+    btn.onclick = () => { DB.trackFilter = cName; renderTrackList(); };
+    container.appendChild(btn);
+  }
+}
+
+function exportTrackCsv() {
+  let csv = 'MODEL,SERIAL NUMBER,DATE IN,DISPATCHED AT,CUSTOMER DESTINATION,STATUS\n';
+  DB.trackList.forEach(r => {
+    csv += `"${r.model}","${r.serial}","${r.dateIn}","${r.dateOut}","${r.customer}","Dispatched"\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'track_list_export.csv';
+  a.click();
+  showToast('Exported track_list_export.csv');
+}
+
+/* =========================================================
+   5. RETURN SCREEN LOGIC
+   ========================================================= */
+function renderReturnScreen() {
+  const select = document.getElementById('rma-serial-select');
+  select.innerHTML = '';
+  if (!DB.trackList.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '\u2014 no dispatched units \u2014';
+    select.appendChild(opt);
+  }
+  DB.trackList.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.serial;
+    opt.textContent = `${r.serial} - ${r.model} (${r.customer})`;
+    select.appendChild(opt);
+  });
+
+  renderReturnTable();
+}
+
+function renderReturnTable() {
+  const tbody = document.getElementById('rma-table-tbody');
+  tbody.innerHTML = '';
+
+  DB.returns.forEach(r => {
+    const tr = document.createElement('tr');
+    const badge = r.action === 'Restocked' ? '<span class="badge badge-green">Restocked</span>' : '<span class="badge badge-red">Quarantined</span>';
+    tr.innerHTML = `
+      <td class="mono" style="font-weight:700;">${r.serial}</td>
+      <td style="font-weight:600;">${r.model}</td>
+      <td>${r.customer}</td>
+      <td style="color:var(--text-muted);">${r.reason}</td>
+      <td>${badge}</td>
+      <td style="text-align:right; color:var(--text-muted);">${r.date}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function submitRmaAction(isRestock) {
+  const sel = document.getElementById('rma-serial-select');
+  const serial = sel.value;
+  if (!serial) {
+    showToast('Please select a valid dispatched unit.');
+    return;
+  }
+  const reason = document.getElementById('rma-reason').value;
+  const condition = document.getElementById('rma-condition').value;
+  const notes = (document.getElementById('rma-notes').value || '').trim();
+  try {
+    await apiPost('/api/returns', {
+      serial, reason, condition, notes,
+      action: isRestock ? 'restock' : 'quarantine'
+    });
+    showToast(isRestock
+      ? `Restocked ${serial} to Available Stock`
+      : `Quarantined ${serial} for audit`);
+    document.getElementById('rma-notes').value = '';
+    await refreshData();
+  } catch (e) {
+    showToast('Return failed: ' + e.message);
+  }
+}
+
+/* =========================================================
+   6. CONFIG MODAL LOGIC
+   ========================================================= */
+function provLabel(pid) {
+  return (DB.config && DB.config.providers && DB.config.providers[pid])
+    ? DB.config.providers[pid].label : pid;
+}
+
+async function loadConfig() {
+  try {
+    DB.config = await apiGet('/api/config');
+    const a = DB.config.active;
+    document.getElementById('header-model-label').textContent =
+      `Scan Model (${provLabel(a.provider)} \u00b7 ${a.model})`;
+  } catch (e) {
+    logLine('Config load failed: ' + e.message, 'log-line-warn');
+  }
+}
+
+function openConfigModal() {
+  const pSelect = document.getElementById('cfg-provider');
+  const active = (DB.config && DB.config.active) || { provider: 'gemini', model: '' };
+  if (pSelect) pSelect.value = active.provider;
+  updateModelOptions(active.provider, active.model);
+  document.getElementById('config-modal').classList.add('open');
+}
+
+function closeConfigModal() {
+  document.getElementById('config-modal').classList.remove('open');
+}
+
+function updateModelOptions(prov, selectedModel = null) {
+  const ms = document.getElementById('cfg-model');
+  const list = (DB.config && DB.config.providers[prov])
+    ? DB.config.providers[prov].models : ['default'];
+  ms.innerHTML = list.map(m => `<option value="${m}">${m}</option>`).join('');
+  if (selectedModel && list.includes(selectedModel)) {
+    ms.value = selectedModel;
+  } else {
+    ms.value = list[0];
+  }
+  updateRoutingPreview();
+  renderProviderKeys(prov);
+  const keyInput = document.getElementById('cfg-new-key');
+  if (keyInput) keyInput.placeholder = 'Enter ' + provLabel(prov) + ' API key';
+}
+
+function updateRoutingPreview() {
+  const prov = document.getElementById('cfg-provider').value;
+  const model = document.getElementById('cfg-model').value;
+  const prev = document.getElementById('cfg-routing-preview');
+  if (prev) prev.textContent = `${provLabel(prov)} \u00b7 ${model}`;
+}
+
+function renderProviderKeys(prov) {
+  const tbody = document.getElementById('cfg-keys-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const keys = (DB.config && DB.config.providers[prov])
+    ? DB.config.providers[prov].keys : [];
+  const badgeLabel = document.getElementById('cfg-keys-count-label');
+  if (badgeLabel) {
+    badgeLabel.textContent = keys.length + (keys.length === 1 ? ' key registered' : ' keys registered');
+  }
+
+  if (keys.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="5" style="text-align:center; padding:16px; color:var(--text-sub); font-size:11.5px;">No keys registered for ${prov}. Add one below.</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  keys.forEach((k, idx) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="badge badge-green" style="font-size:10px;">${provLabel(prov)}</span></td>
+      <td class="mono" style="color:var(--text-muted);">${k.masked}</td>
+      <td><span style="color:var(--green-bright); font-weight:700; font-size:11px;">${k.status || 'ACTIVE'}</span></td>
+      <td style="color:var(--text-muted);">${k.remark || '\u2014'}</td>
+      <td style="text-align:right;">
+        <button style="background:none; border:none; color:#f87171; cursor:pointer; font-size:13px;" onclick="removeKey('${prov}', ${idx})" title="Remove key">&#128465;</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function removeKey(prov, idx) {
+  const keys = DB.config.providers[prov].keys;
+  if (!keys[idx]) return;
+  try {
+    await apiDel(`/api/config/keys?provider=${encodeURIComponent(prov)}&index=${idx}`);
+    keys.splice(idx, 1);
+    renderProviderKeys(prov);
+    showToast('Removed key for ' + provLabel(prov));
+  } catch (e) {
+    showToast('Remove failed: ' + e.message);
+  }
+}
+
+async function addNewKey() {
+  const keyInput = document.getElementById('cfg-new-key');
+  const remInput = document.getElementById('cfg-new-remark');
+  const key = keyInput.value.trim();
+  const rem = remInput.value.trim() || '\u2014';
+  const prov = document.getElementById('cfg-provider').value;
+
+  if (!key) {
+    showToast('Please enter an API key.');
+    return;
+  }
+
+  try {
+    await apiPost('/api/config/keys', { provider: prov, key, remark: rem });
+    await loadConfig();
+    renderProviderKeys(prov);
+    keyInput.value = '';
+    remInput.value = '';
+    showToast('API key registered for ' + provLabel(prov));
+  } catch (e) {
+    showToast('Add failed: ' + e.message);
+  }
+}
+
+async function applyConfigSettings() {
+  const prov = document.getElementById('cfg-provider').value;
+  const model = document.getElementById('cfg-model').value;
+  try {
+    await apiPost('/api/config', { provider: prov, model });
+    document.getElementById('header-model-label').textContent = `Scan Model (${provLabel(prov)} \u00b7 ${model})`;
+    document.getElementById('cfg-routing-preview').textContent = `${provLabel(prov)} \u00b7 ${model}`;
+    await loadConfig();
+    closeConfigModal();
+    showToast(`Config applied: ${provLabel(prov)} \u00b7 ${model}`);
+  } catch (e) {
+    showToast('Apply failed: ' + e.message);
+  }
+}
+
+/* Keyboard escape listener & modal backdrop click */
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeConfigModal(); });
+document.getElementById('config-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('config-modal')) closeConfigModal();
+});
+
+/* Day / Dark Theme toggle with state persistence */
+function toggleTheme() {
+  document.body.classList.toggle('theme-light');
+  const isLight = document.body.classList.contains('theme-light');
+  const txt = document.getElementById('theme-mode-text');
+  if (txt) txt.textContent = isLight ? 'Day' : 'Dark';
+  try { localStorage.setItem('ac_stock_theme', isLight ? 'light' : 'dark'); } catch(e){}
+  showToast(isLight ? 'Day (Light) Mode activated' : 'Night (Dark) Mode activated', isLight ? '&#9728;' : '&#9790;');
+}
+
+/* Clean download feature */
+function downloadCurrentHtml() {
+  const html = document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ac-stock-tracker.html';
+  a.click();
+  showToast('Downloaded current ac-stock-tracker.html');
+}
+
+/* Initialization */
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    const saved = localStorage.getItem('ac_stock_theme');
+    if (saved === 'light') {
+      document.body.classList.add('theme-light');
+      const txt = document.getElementById('theme-mode-text');
+      if (txt) txt.textContent = 'Day';
+    }
+  } catch(e){}
+  await refreshData();
+  await loadConfig();
+  switchTab('stock-in');
+});
+</script>
+</body>
+</html>

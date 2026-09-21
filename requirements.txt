@@ -1,3 +1,5 @@
-flet>=0.86
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
 google-genai>=1.0
 openpyxl>=3.1

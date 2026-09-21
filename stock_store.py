@@ -1,10 +1,19 @@
-"""Excel-backed store for the Daikin Stock Tracker.
+"""Excel-backed store for the AC Stock Tracker.
 
 One workbook (daikin_stock.xlsx, next to the app) holds:
   MasterRecord — one row per physical unit:
-      Supplier | Type | Model | Serial | Date In | Status | Customer | Date Out
-  Types        — the Type list (Wall Mount, Cassette, ...)
-  ModelTypes   — exact full Model string -> Type (never prefix matching)
+      Supplier | Brand | Model | Serial | Date In | Status | Customer | Date Out
+  Brands       — the brand list (Daikin, LG, Panasonic, ...)
+  ModelBrands  — exact full Model string -> Brand (never prefix matching)
+  Returns      — Serial | Model | Customer | Reason | Condition | Notes |
+                 Action | Date
+
+Statuses: "In Stock" | "Sold" | "Quarantined".
+A restocked unit goes back to "In Stock"; a quarantined unit stays out of
+both Available Stock and the Track List but keeps its record.
+
+Existing files from the Type-era schema are migrated automatically:
+sheet Types -> Brands, ModelTypes -> ModelBrands, header Type -> Brand.
 """
 
 from pathlib import Path
@@ -13,19 +22,29 @@ from openpyxl import Workbook, load_workbook
 
 DB_PATH = Path(__file__).with_name("daikin_stock.xlsx")
 
-RECORD_HEADER = ["Supplier", "Type", "Model", "Serial",
+RECORD_HEADER = ["Supplier", "Brand", "Model", "Serial",
                  "Date In", "Status", "Customer", "Date Out"]
+RETURN_HEADER = ["Serial", "Model", "Customer", "Reason",
+                 "Condition", "Notes", "Action", "Date"]
+
+BRAND_COLORS = ["#26d07c", "#3b82f6", "#f59e0b", "#a78bfa",
+                "#f87171", "#38bdf8", "#fb923c", "#4ade80"]
+
+IN_STOCK = "In Stock"
+SOLD = "Sold"
+QUARANTINED = "Quarantined"
 
 
 class StockStore:
     def __init__(self, path: Path = DB_PATH):
         self.path = Path(path)
         self.wb = None
-        self.recs = self.types_sheet = self.map_sheet = None
-        self.records: list[dict] = []          # parsed MasterRecord rows
-        self.types: list[str] = []             # ordered Type names
-        self.model_to_type: dict[str, str] = {}  # UPPER(model) -> Type
-        self._serial_set: set[str] = set()     # lowercase serials
+        self.recs = self.brands_sheet = self.map_sheet = self.ret_sheet = None
+        self.records: list[dict] = []            # parsed MasterRecord rows
+        self.brands: list[str] = []              # ordered Brand names
+        self.model_to_brand: dict[str, str] = {}  # UPPER(model) -> Brand
+        self.returns: list[dict] = []            # parsed Returns rows
+        self._serial_set: set[str] = set()       # lowercase serials
         self.load()
 
     # ---------------------------------------------------------- load/save
@@ -35,27 +54,47 @@ class StockStore:
         else:
             self.wb = Workbook()
             self.wb.active.title = "MasterRecord"
+        self._migrate_type_schema()
         self.recs = self._sheet("MasterRecord", RECORD_HEADER)
-        self.types_sheet = self._sheet("Types", ["Type"])
-        self.map_sheet = self._sheet("ModelTypes", ["Model", "Type"])
+        self.brands_sheet = self._sheet("Brands", ["Brand"])
+        self.map_sheet = self._sheet("ModelBrands", ["Model", "Brand"])
+        self.ret_sheet = self._sheet("Returns", RETURN_HEADER)
 
-        self.records, self.types, self.model_to_type, self._serial_set = \
-            [], [], {}, set()
+        self.records, self.brands, self.model_to_brand = [], [], {}
+        self.returns, self._serial_set = [], set()
         for idx, row in enumerate(
                 self.recs.iter_rows(min_row=2, values_only=True), start=2):
             if not row or row[3] in (None, ""):
                 continue
-            rec = dict(zip(RECORD_HEADER, ("" if v is None else v for v in row)))
+            rec = dict(zip(RECORD_HEADER,
+                           ("" if v is None else v for v in row)))
             rec["_row"] = idx  # Excel row, so updates hit the right cells
             self.records.append(rec)
             self._serial_set.add(str(rec["Serial"]).strip().lower())
-        for row in self.types_sheet.iter_rows(min_row=2, values_only=True):
-            if row and row[0] and row[0] not in self.types:
-                self.types.append(str(row[0]))
+        for row in self.brands_sheet.iter_rows(min_row=2, values_only=True):
+            if row and row[0] and row[0] not in self.brands:
+                self.brands.append(str(row[0]))
         for row in self.map_sheet.iter_rows(min_row=2, values_only=True):
             if row and row[0] and row[1]:
-                self.model_to_type[str(row[0]).upper()] = str(row[1])
+                self.model_to_brand[str(row[0]).upper()] = str(row[1])
+        for row in self.ret_sheet.iter_rows(min_row=2, values_only=True):
+            if not row or row[0] in (None, ""):
+                continue
+            self.returns.append(dict(
+                zip(RETURN_HEADER, ("" if v is None else v for v in row))))
         self.save()
+
+    def _migrate_type_schema(self):
+        """Rename the Type-era sheets/column to Brand once, in place."""
+        names = self.wb.sheetnames
+        if "Types" in names and "Brands" not in names:
+            self.wb["Types"].title = "Brands"
+        if "ModelTypes" in names and "ModelBrands" not in names:
+            self.wb["ModelTypes"].title = "ModelBrands"
+        if "MasterRecord" in names:
+            hdr = self.wb["MasterRecord"].cell(row=1, column=2).value
+            if str(hdr or "").strip() == "Type":
+                self.wb["MasterRecord"].cell(row=1, column=2, value="Brand")
 
     def _sheet(self, name: str, header: list[str]):
         ws = (self.wb[name] if name in self.wb.sheetnames
@@ -72,45 +111,88 @@ class StockStore:
         self.wb.save(self.path)
 
     # ---------------------------------------------------------- queries
-    def type_for(self, model: str) -> str:
-        return self.model_to_type.get(model.strip().upper(), "")
+    def brand_for(self, model: str) -> str:
+        return self.model_to_brand.get(model.strip().upper(), "")
 
     def find_dupes(self, serials: list[str]) -> list[str]:
         return [s for s in serials
                 if s.strip().lower() in self._serial_set]
+
+    def _brand_color(self, name: str) -> str:
+        try:
+            return BRAND_COLORS[self.brands.index(name) % len(BRAND_COLORS)]
+        except ValueError:
+            return BRAND_COLORS[len(self.brands) % len(BRAND_COLORS)]
+
+    def inventory(self) -> dict:
+        """In-stock units grouped Brand -> Model -> serials (UI shape)."""
+        inv: dict[str, dict] = {}
+        for rec in self.records:
+            if str(rec["Status"]).strip() != IN_STOCK:
+                continue
+            model = str(rec["Model"]).strip()
+            brand = str(rec["Brand"]).strip() or "UNBRANDED"
+            b = inv.setdefault(brand, {"color": self._brand_color(brand),
+                                       "open": True, "models": {}})
+            m = b["models"].setdefault(
+                model, {"dateIn": str(rec["Date In"]), "serials": []})
+            m["serials"].append(str(rec["Serial"]))
+        # keep zero-stock brands visible too
+        for brand in self.brands:
+            inv.setdefault(brand, {"color": self._brand_color(brand),
+                                   "open": True, "models": {}})
+        for b in inv.values():
+            for i, m in enumerate(sorted(b["models"]), start=1):
+                b["models"][m]["idx"] = f"{i:02d}"
+        return dict(sorted(inv.items()))
+
+    def track_list(self) -> list[dict]:
+        """Sold units, newest first."""
+        out = [{"model": str(r["Model"]), "serial": str(r["Serial"]),
+                "dateIn": str(r["Date In"]), "dateOut": str(r["Date Out"]),
+                "customer": str(r["Customer"]), "status": str(r["Status"])}
+               for r in self.records if str(r["Status"]).strip() == SOLD]
+        return out
+
+    def returns_list(self) -> list[dict]:
+        return [{"serial": str(r["Serial"]), "model": str(r["Model"]),
+                 "customer": str(r["Customer"]), "reason": str(r["Reason"]),
+                 "condition": str(r["Condition"]), "notes": str(r["Notes"]),
+                 "action": str(r["Action"]), "date": str(r["Date"])}
+                for r in self.returns]
 
     # ---------------------------------------------------------- mutations
     def stock_in(self, supplier: str, model: str, serials: list[str],
                  date_in: str):
         """Shared save path for manual entry and scanned rows.
 
-        Returns (added, dupes, ok_type):
+        Returns (added, dupes, ok_brand):
           added  — serials written (one MasterRecord row each)
           dupes  — serials skipped because they already exist
-          ok_type — False when the Model is unknown and no save happened;
-                    UI must collect a Type then call stock_in_with_type().
+          ok_brand — False when the Model is unknown and no save happened;
+                     UI must collect a Brand then call stock_in_with_brand().
         """
         serials = [s.strip() for s in serials if s.strip()]
         if not supplier.strip() or not model.strip() or not serials:
             return [], serials, True
         dupes, new_serials = self._split_dupes(serials)
-        type_name = self.type_for(model)
-        if not type_name:
+        brand = self.brand_for(model)
+        if not brand:
             return [], dupes, False
-        self._write_rows(supplier.strip(), model.strip(), type_name,
+        self._write_rows(supplier.strip(), model.strip(), brand,
                          new_serials, date_in)
         return new_serials, dupes, True
 
-    def stock_in_with_type(self, supplier: str, model: str, serials: list[str],
-                           date_in: str, type_name: str):
-        """Completes stock_in for a Model the user just assigned a Type."""
-        type_name = type_name.strip()
-        if not type_name:
+    def stock_in_with_brand(self, supplier: str, model: str,
+                            serials: list[str], date_in: str, brand: str):
+        """Completes stock_in for a Model the user just assigned a Brand."""
+        brand = brand.strip()
+        if not brand:
             return [], serials
-        self.assign_type(model, type_name)
+        self.assign_brand(model, brand)
         dupes, new_serials = self._split_dupes(
             [s.strip() for s in serials if s.strip()])
-        self._write_rows(supplier.strip(), model.strip(), type_name,
+        self._write_rows(supplier.strip(), model.strip(), brand,
                          new_serials, date_in)
         return new_serials, dupes
 
@@ -126,13 +208,13 @@ class StockStore:
             seen.add(s.lower())
         return dupes, new_serials
 
-    def _write_rows(self, supplier, model, type_name, serials, date_in):
+    def _write_rows(self, supplier, model, brand, serials, date_in):
         for s in serials:
-            self.recs.append([supplier, type_name, model, s, date_in,
-                              "In Stock", "", ""])
-            self.records.append({"Supplier": supplier, "Type": type_name,
+            self.recs.append([supplier, brand, model, s, date_in,
+                              IN_STOCK, "", ""])
+            self.records.append({"Supplier": supplier, "Brand": brand,
                                  "Model": model, "Serial": s,
-                                 "Date In": date_in, "Status": "In Stock",
+                                 "Date In": date_in, "Status": IN_STOCK,
                                  "Customer": "", "Date Out": "",
                                  "_row": self.recs.max_row})
             self._serial_set.add(s.lower())
@@ -149,13 +231,13 @@ class StockStore:
         done = []
         for rec in self.records:
             if (str(rec["Serial"]).strip().lower() not in wanted
-                    or str(rec["Status"]).strip() != "In Stock"):
+                    or str(rec["Status"]).strip() != IN_STOCK):
                 continue
-            rec["Status"] = "Sold"
+            rec["Status"] = SOLD
             rec["Customer"] = customer
             rec["Date Out"] = date_out
             row = rec["_row"]
-            self.recs.cell(row=row, column=6, value="Sold")
+            self.recs.cell(row=row, column=6, value=SOLD)
             self.recs.cell(row=row, column=7, value=customer)
             self.recs.cell(row=row, column=8, value=date_out)
             done.append(str(rec["Serial"]))
@@ -163,53 +245,56 @@ class StockStore:
             self.save()
         return done
 
-    # ---------------------------------------------------------- types
-    def assign_type(self, model: str, type_name: str):
-        """Remember Model -> Type permanently (exact full string match)."""
-        if type_name not in self.types:
-            self.types.append(type_name)
-            self.types_sheet.append([type_name])
+    def create_return(self, serial: str, reason: str, condition: str,
+                      notes: str, action: str, date: str):
+        """Return a sold unit: action 'restock' puts it back In Stock,
+        'quarantine' pulls it aside. Returns (record, error)."""
+        key = serial.strip().lower()
+        rec = next((r for r in self.records
+                    if str(r["Serial"]).strip().lower() == key
+                    and str(r["Status"]).strip() == SOLD), None)
+        if rec is None:
+            return None, "No sold unit found for serial " + serial
+        action_label = "Restocked" if action == "restock" else "Quarantined"
+        self.ret_sheet.append([str(rec["Serial"]), str(rec["Model"]),
+                               str(rec["Customer"]), reason, condition,
+                               notes, action_label, date])
+        self.returns.append({
+            "Serial": rec["Serial"], "Model": rec["Model"],
+            "Customer": rec["Customer"], "Reason": reason,
+            "Condition": condition, "Notes": notes,
+            "Action": action_label, "Date": date})
+        row = rec["_row"]
+        if action == "restock":
+            rec["Status"] = IN_STOCK
+            rec["Customer"] = ""
+            rec["Date Out"] = ""
+            self.recs.cell(row=row, column=6, value=IN_STOCK)
+            self.recs.cell(row=row, column=7, value="")
+            self.recs.cell(row=row, column=8, value="")
+        else:
+            rec["Status"] = QUARANTINED
+            self.recs.cell(row=row, column=6, value=QUARANTINED)
+        self.save()
+        return rec, None
+
+    # ---------------------------------------------------------- brands
+    def assign_brand(self, model: str, brand: str):
+        """Remember Model -> Brand permanently (exact full string match)."""
+        if brand not in self.brands:
+            self.brands.append(brand)
+            self.brands_sheet.append([brand])
         key = model.strip().upper()
-        if self.model_to_type.get(key) != type_name:
-            self.model_to_type[key] = type_name
-            self.map_sheet.append([model.strip(), type_name])
+        if self.model_to_brand.get(key) != brand:
+            self.model_to_brand[key] = brand
+            self.map_sheet.append([model.strip(), brand])
         self.save()
 
-    def rename_type(self, old: str, new: str):
-        """Rename a Type everywhere: Types, ModelTypes and every record."""
-        old, new = old.strip(), new.strip()
-        if not new or old == new:
+    def add_brand(self, brand: str) -> bool:
+        brand = brand.strip()
+        if not brand or brand in self.brands:
             return False
-        if new in self.types:
-            return False
-        self.types = [new if t == old else t for t in self.types]
-        for row in range(2, self.types_sheet.max_row + 1):
-            if str(self.types_sheet.cell(row=row, column=1).value or
-                   "").strip() == old:
-                self.types_sheet.cell(row=row, column=1, value=new)
-        for key, val in list(self.model_to_type.items()):
-            if val == old:
-                self.model_to_type[key] = new
-        for row in range(2, self.map_sheet.max_row + 1):
-            if str(self.map_sheet.cell(row=row, column=2).value or
-                   "").strip() == old:
-                self.map_sheet.cell(row=row, column=2, value=new)
-        for rec in self.records:
-            if str(rec["Type"]).strip() == old:
-                rec["Type"] = new
-                self.recs.cell(row=rec["_row"], column=2, value=new)
-        self.save()
-        return True
-
-    def models_for_type(self, type_name: str) -> list[str]:
-        return sorted({str(r["Model"]) for r in self.records
-                       if str(r["Type"]).strip() == type_name})
-
-    def add_type(self, type_name: str) -> bool:
-        type_name = type_name.strip()
-        if not type_name or type_name in self.types:
-            return False
-        self.types.append(type_name)
-        self.types_sheet.append([type_name])
+        self.brands.append(brand)
+        self.brands_sheet.append([brand])
         self.save()
         return True
