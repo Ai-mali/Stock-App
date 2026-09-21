@@ -3115,10 +3115,16 @@ function closeConfigModal() {
   document.getElementById('config-modal').classList.remove('open');
 }
 
-function updateModelOptions(prov, selectedModel = null) {
+async function updateModelOptions(prov, selectedModel = null) {
   const ms = document.getElementById('cfg-model');
-  const list = (DB.config && DB.config.providers[prov])
+  let list = (DB.config && DB.config.providers[prov])
     ? DB.config.providers[prov].models : ['default'];
+  try {
+    const res = await apiGet('/api/config/models?provider=' + encodeURIComponent(prov));
+    if (res.models && res.models.length) list = res.models;
+  } catch (e) { /* static list stays */ }
+  const configured = DB.config && DB.config.providers[prov] && DB.config.providers[prov].model;
+  if (configured && !list.includes(configured)) list.unshift(configured);
   ms.innerHTML = list.map(m => `<option value="${m}">${m}</option>`).join('');
   if (selectedModel && list.includes(selectedModel)) {
     ms.value = selectedModel;

@@ -153,6 +153,54 @@ def mask_key(key: str) -> str:
     return key[:6] + "..." + key[-4:] if len(key) > 10 else key
 
 
+def list_models(provider: str) -> list[str]:
+    """Fetch the live model list from the provider API with the first saved
+    key, so new models appear automatically. Falls back to the static
+    PROVIDERS list when no key is saved or the request fails."""
+    static = PROVIDERS.get(provider, {}).get("models", [])
+    keys = load_providers().get(provider, {}).get("keys", [])
+    if not keys:
+        return static
+    key = keys[0]["key"]
+    try:
+        if provider == "gemini":
+            url = ("https://generativelanguage.googleapis.com/v1beta/models"
+                   f"?key={key}")
+            body = json.loads(
+                urllib.request.urlopen(url, timeout=30).read().decode())
+            names = [m["name"].split("/")[-1] for m in body.get("models", [])
+                     if "generateContent" in
+                     m.get("supportedGenerationMethods", [])]
+            keep = [n for n in names if "flash" in n or "pro" in n]
+            return keep or names or static
+        if provider == "anthropic":
+            req = urllib.request.Request(
+                "https://api.anthropic.com/v1/models",
+                headers={"x-api-key": key,
+                         "anthropic-version": "2023-06-01"})
+            body = json.loads(
+                urllib.request.urlopen(req, timeout=30).read().decode())
+            ids = [m.get("id", "") for m in body.get("data", [])]
+            ids = [i for i in ids if i.startswith("claude")]
+            return ids or static
+        # OpenAI-compatible providers: <base>/chat/completions -> <base>/models
+        base = PROVIDERS[provider]["url"].rsplit("/chat/completions", 1)[0]
+        req = urllib.request.Request(
+            base + "/models", headers={"Authorization": f"Bearer {key}"})
+        body = json.loads(
+            urllib.request.urlopen(req, timeout=30).read().decode())
+        ids = [m.get("id", "") for m in body.get("data", [])]
+        if provider == "alibaba":
+            ids = [i for i in ids if "vl" in i.lower()]
+        elif provider == "openai":
+            ids = [i for i in ids if i.startswith("gpt")]
+        elif provider == "deepseek":
+            ids = [i for i in ids if i.startswith("deepseek")]
+        return ids or static
+    except Exception:
+        return static
+
+
 # ------------------------------------------------------------- parsing
 def expand_serial_range(text: str) -> str:
     """Expand inclusive ranges like 'K016634 - K016636' into serials.

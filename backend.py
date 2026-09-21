@@ -204,6 +204,12 @@ def get_config():
     return _config_payload()
 
 
+@app.get("/api/config/models")
+def list_models(provider: str):
+    """Live model list for a provider (fetches via its API, else static)."""
+    return {"models": scanner.list_models(provider)}
+
+
 class ConfigBody(BaseModel):
     provider: str
     model: str
