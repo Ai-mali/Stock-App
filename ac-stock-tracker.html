@@ -1062,25 +1062,185 @@ body.theme-light .btn-preview-action.btn-clear:hover {
   border-bottom: 1px solid var(--border);
 }
 
+/* Serials Wrap & Badge Custom Scroll */
+.scan-serials-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  max-height: 82px;
+  overflow-y: auto;
+  padding: 2px 4px 2px 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.scan-serials-wrap::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scan-serials-wrap::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.scan-serials-wrap::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+}
+
+.scan-serials-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--text-sub);
+}
+
 .scan-serial-badge {
-  display: inline-block;
-  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px 7px;
   border-radius: 4px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 600;
   background: rgba(38, 208, 124, 0.1);
   color: var(--green-bright);
-  border: 1px solid rgba(38, 208, 124, 0.2);
-  margin: 1px;
+  border: 1px solid rgba(38, 208, 124, 0.22);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  transition: all .15s ease;
+  user-select: all;
 }
 
-/* keep scan rows one-line tall: serials scroll inside their own cell */
-.scan-results-table td { vertical-align: top; }
-.scan-serial-wrap {
-  max-height: 72px;
+.scan-serial-badge:hover {
+  background: rgba(38, 208, 124, 0.2);
+  border-color: rgba(38, 208, 124, 0.45);
+  transform: translateY(-1px);
+}
+
+/* Stock In table vertical scroll with sticky header */
+.stock-in-table-scroll {
+  max-height: 380px;
   overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+}
+
+.stock-in-table-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.stock-in-table-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.stock-in-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 4px;
+}
+
+.stock-in-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-sub);
+}
+
+.stock-in-table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface2);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* Actions column & inward-shifted icon buttons */
+.actions-cell {
+  text-align: right;
+  white-space: nowrap;
+  width: 115px;
+  vertical-align: middle;
+  padding-right: 18px !important;
+}
+
+.actions-btn-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.btn-action-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.btn-action-icon:hover {
+  border-color: var(--border-light);
+  color: var(--text);
+  background: var(--surface3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.btn-action-icon.btn-action-commit {
+  background: #116852;
+  border-color: #116852;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(17, 104, 82, 0.35);
+}
+
+.btn-action-icon.btn-action-commit:hover {
+  background: #148065;
+  border-color: #148065;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(17, 104, 82, 0.55), 0 0 10px rgba(38, 208, 124, 0.3);
+}
+
+/* Light theme overrides */
+body.theme-light .stock-in-table-scroll thead th {
+  background: var(--surface2);
+  box-shadow: 0 1px 0 var(--border);
+}
+body.theme-light .stock-in-table-scroll::-webkit-scrollbar-track,
+body.theme-light .scan-serials-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+body.theme-light .stock-in-table-scroll::-webkit-scrollbar-thumb,
+body.theme-light .scan-serials-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+body.theme-light .btn-action-icon {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+body.theme-light .btn-action-icon:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+body.theme-light .btn-action-icon.btn-action-commit {
+  background: #116852;
+  border-color: #116852;
+  color: #ffffff;
+}
+body.theme-light .btn-action-icon.btn-action-commit:hover {
+  background: #0d5442;
 }
 
 /* Available Stock & Accordion Hierarchy */
@@ -1761,15 +1921,15 @@ body.theme-light .btn-preview-action.btn-clear:hover {
               <input type="date" class="form-input" id="scan-date-in" value="2026-09-18">
             </div>
           </div>
-          <div class="table-container" style="flex:1;">
-            <table class="data-table scan-results-table">
+          <div class="table-container stock-in-table-scroll" style="flex:1;">
+            <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width:40px;">No</th>
-                  <th>Model <span id="scan-hdr-model-cnt" style="opacity:.6;">(5)</span></th>
-                  <th>Serial <span id="scan-hdr-serial-cnt" style="opacity:.6;">(12)</span></th>
-                  <th>Qty <span id="scan-hdr-qty-cnt" style="opacity:.6;">(12)</span></th>
-                  <th style="text-align:right;">Actions</th>
+                  <th style="width:44px; text-align:center;">No</th>
+                  <th style="width:130px; white-space:nowrap;">Model <span id="scan-hdr-model-cnt" style="opacity:.6;">(0)</span></th>
+                  <th>Serial <span id="scan-hdr-serial-cnt" style="opacity:.6;">(0)</span></th>
+                  <th style="width:70px; text-align:right; white-space:nowrap;">Qty <span id="scan-hdr-qty-cnt" style="opacity:.6;">(0)</span></th>
+                  <th style="text-align:right; width:115px; padding-right:18px; white-space:nowrap;">Actions</th>
                 </tr>
               </thead>
               <tbody id="scan-results-tbody"></tbody>
@@ -2286,21 +2446,27 @@ function renderScanResultsTable() {
   DB.scans.forEach((row, idx) => {
     totalSerials += row.serials.length;
     const serialChips = row.serials.length
-      ? '<div class="scan-serial-wrap">' + row.serials.map(s => '<span class="scan-serial-badge">' + s + '</span>').join(' ') + '</div>'
-      : '<span style="color:var(--text-muted); font-size:10.5px;">' + (row.desc || 'no serials') + '</span>';
+      ? row.serials.map(s => '<span class="scan-serial-badge">' + s + '</span>').join('')
+      : `<span style="color:var(--text-sub); font-size:12px; font-weight:500;">${row.desc || 'No serials'}</span>`;
     const flagIcon = row.flag
-      ? ' <span title="' + row.flag + '" style="color:var(--amber, #f0b429); cursor:help;">&#9888;</span>'
+      ? ' <span title="' + row.flag + '" style="color:#f0b429; cursor:help; margin-left:4px;">&#9888;</span>'
       : '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="mono" style="color:var(--text-sub);">${row.no}</td>
-      <td style="font-weight:700;">${row.model || '<span style="color:var(--text-muted);">\u2014</span>'}</td>
-      <td>${serialChips}${flagIcon}</td>
-      <td style="color:var(--text-muted);">${row.qty}</td>
-      <td style="text-align:right;">
-        <button class="btn btn-ghost btn-sm" onclick="editScanRow(${idx})" title="Edit Row" style="margin-right:4px;">&#9998;</button>
-        <button class="btn btn-primary btn-sm" onclick="commitScanRow(${idx})" title="Commit to Inventory">&#9654;</button>
+      <td class="mono" style="color:var(--text-sub); text-align:center; width:44px;">${row.no}</td>
+      <td style="font-weight:700; white-space:nowrap; width:130px;">${row.model || '<span style="color:var(--text-muted);">\u2014</span>'}</td>
+      <td><div class="scan-serials-wrap">${serialChips}${flagIcon}</div></td>
+      <td class="mono" style="color:var(--text-muted); text-align:right; white-space:nowrap; width:70px;">${row.qty}</td>
+      <td class="actions-cell">
+        <div class="actions-btn-group">
+          <button class="btn-action-icon" onclick="editScanRow(${idx})" title="Edit Serials" aria-label="Edit Model Serials">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+          </button>
+          <button class="btn-action-icon btn-action-commit" onclick="commitScanRow(${idx})" title="Commit Model to Available Stock" aria-label="Commit Model to Stock">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>
+          </button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
