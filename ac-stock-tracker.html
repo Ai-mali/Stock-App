@@ -1075,6 +1075,14 @@ body.theme-light .btn-preview-action.btn-clear:hover {
   margin: 1px;
 }
 
+/* keep scan rows one-line tall: serials scroll inside their own cell */
+.scan-results-table td { vertical-align: top; }
+.scan-serial-wrap {
+  max-height: 72px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
 /* Available Stock & Accordion Hierarchy */
 .brand-accordion {
   border: 1px solid var(--border);
@@ -1754,7 +1762,7 @@ body.theme-light .btn-preview-action.btn-clear:hover {
             </div>
           </div>
           <div class="table-container" style="flex:1;">
-            <table class="data-table">
+            <table class="data-table scan-results-table">
               <thead>
                 <tr>
                   <th style="width:40px;">No</th>
@@ -2278,7 +2286,7 @@ function renderScanResultsTable() {
   DB.scans.forEach((row, idx) => {
     totalSerials += row.serials.length;
     const serialChips = row.serials.length
-      ? row.serials.map(s => '<span class="scan-serial-badge">' + s + '</span>').join(' ')
+      ? '<div class="scan-serial-wrap">' + row.serials.map(s => '<span class="scan-serial-badge">' + s + '</span>').join(' ') + '</div>'
       : '<span style="color:var(--text-muted); font-size:10.5px;">' + (row.desc || 'no serials') + '</span>';
     const flagIcon = row.flag
       ? ' <span title="' + row.flag + '" style="color:var(--amber, #f0b429); cursor:help;">&#9888;</span>'
