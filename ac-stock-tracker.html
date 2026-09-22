@@ -2319,6 +2319,32 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
   </div>
 </div>
 
+<!-- ZOOM SCANNED ITEM MODAL (READ-ONLY ENLARGED VIEW) -->
+<div class="modal-overlay" id="zoom-scan-modal">
+  <div class="modal-dialog" style="max-width: 720px; max-height:85vh; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Scanned Serials</div>
+        <div style="font-size:12px; color:var(--text-sub); margin-top:3px;">
+          <span class="mono" id="zoom-scan-no" style="color:var(--text-sub);"></span>
+          <span style="margin:0 8px; opacity:.4;">|</span>
+          <span id="zoom-scan-model" style="color:var(--text-main); font-weight:700;"></span>
+          <span style="margin:0 8px; opacity:.4;">|</span>
+          <span class="mono" id="zoom-scan-qty"></span>
+        </div>
+      </div>
+      <button class="btn-circle" onclick="closeZoomScanModal()" title="Close">&#10005;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto; flex:1;">
+      <div id="zoom-scan-serials" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+    <div class="modal-footer">
+      <span style="font-size:11px; color:var(--text-sub);" id="zoom-scan-count"></span>
+      <button class="btn btn-ghost" onclick="closeZoomScanModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container"></div>
 
@@ -2513,6 +2539,9 @@ function renderScanResultsTable() {
       <td class="mono" style="color:var(--text-muted); text-align:right; white-space:nowrap; width:70px;">${row.qty}</td>
       <td class="actions-cell">
         <div class="actions-btn-group">
+          <button class="btn-action-icon" onclick="zoomScanRow(${idx})" title="View All Serials (Zoom)" aria-label="Zoom Serials">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </button>
           <button class="btn-action-icon" onclick="editScanRow(${idx})" title="Edit Serials" aria-label="Edit Model Serials">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
           </button>
@@ -2686,6 +2715,31 @@ async function triggerScanSimulation() {
   laser.style.display = 'none';
   btn.disabled = false;
   btn.innerHTML = `${scanSvg}<span>SCAN</span>`;
+}
+
+function zoomScanRow(idx) {
+  const row = DB.scans[idx];
+  if (!row) return;
+
+  document.getElementById('zoom-scan-no').textContent = 'No. ' + (row.no ?? '');
+  document.getElementById('zoom-scan-model').textContent = row.model || 'No model';
+  document.getElementById('zoom-scan-qty').textContent = row.qty || '';
+  document.getElementById('zoom-scan-count').textContent =
+    row.serials.length + ' serial' + (row.serials.length === 1 ? '' : 's');
+
+  const wrap = document.getElementById('zoom-scan-serials');
+  wrap.innerHTML = row.serials.length
+    ? row.serials.map(s =>
+        '<span class="scan-serial-badge" style="font-size:15px; padding:7px 13px; border-radius:8px;">' + s + '</span>'
+      ).join('')
+    : '<span style="color:var(--text-sub); font-size:14px;">' + (row.desc || 'No serials') + '</span>';
+
+  document.getElementById('zoom-scan-modal').classList.add('open');
+}
+
+function closeZoomScanModal() {
+  const modal = document.getElementById('zoom-scan-modal');
+  if (modal) modal.classList.remove('open');
 }
 
 let currentEditingScanIdx = null;
@@ -3556,6 +3610,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeConfigModal();
     closeEditScanModal();
+    closeZoomScanModal();
   }
 });
 document.getElementById('config-modal').addEventListener('click', e => {
@@ -3563,6 +3618,9 @@ document.getElementById('config-modal').addEventListener('click', e => {
 });
 document.getElementById('edit-scan-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('edit-scan-modal')) closeEditScanModal();
+});
+document.getElementById('zoom-scan-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('zoom-scan-modal')) closeZoomScanModal();
 });
 
 /* Day / Dark Theme toggle with state persistence */
