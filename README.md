@@ -3,6 +3,9 @@
 Photo-scan parts lists (vision AI) into an Excel-backed stock system:
 Stock In → Available Stock → Stock Out → Track List → Return.
 
+**Continuing development? Read `HANDOFF.md` first** — it documents the
+architecture, business rules, non-git files, and remaining roadmap.
+
 ## Run
 
 ```
