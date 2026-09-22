@@ -2266,6 +2266,59 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
   </div>
 </div>
 
+<!-- EDIT SCANNED ITEM MODAL (NO, MODEL, SERIALS, QTY) -->
+<div class="modal-overlay" id="edit-scan-modal">
+  <div class="modal-dialog" style="max-width: 580px;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Edit Scanned Item</div>
+        <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">Update row No, Model name, Quantity, and Serial numbers.</div>
+      </div>
+      <button class="btn-circle" onclick="closeEditScanModal()" title="Close">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-scan-idx" value="">
+
+      <div style="display:grid; grid-template-columns: 90px 1fr 110px; gap:12px; margin-bottom:16px;">
+        <div>
+          <label class="form-label" for="edit-scan-no">No.</label>
+          <input type="text" class="form-input mono" id="edit-scan-no" placeholder="10" autocomplete="off">
+        </div>
+        <div>
+          <label class="form-label" for="edit-scan-model">Model</label>
+          <input type="text" class="form-input" id="edit-scan-model" placeholder="e.g. FCFC71AV1F" autocomplete="off" style="font-weight:600;">
+        </div>
+        <div>
+          <label class="form-label" for="edit-scan-qty">Quantity</label>
+          <input type="text" class="form-input mono" id="edit-scan-qty" placeholder="28 PC" autocomplete="off">
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label class="form-label" for="edit-scan-serials" style="margin-bottom:0;">Serial Numbers</label>
+          <span style="font-size:11px; color:var(--green-bright); font-weight:600; font-family:'JetBrains Mono', monospace;" id="edit-scan-serials-count">0 serials</span>
+        </div>
+        <textarea class="form-textarea mono" id="edit-scan-serials" rows="6" placeholder="Enter serial numbers separated by commas, spaces, or line breaks (e.g. K000535, K000537, K000538...)" oninput="updateEditScanSerialCount()" style="font-size:11.5px; line-height:1.6; min-height:130px;"></textarea>
+        <div style="font-size:11px; color:var(--text-sub); margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+          <span>Separate with commas, spaces, or newlines</span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="formatEditScanSerials()" style="padding:2px 8px; font-size:10.5px;">Auto-Format (Comma Separated)</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger-ghost" onclick="deleteCurrentScanRow()" title="Remove this row" style="display:inline-flex; align-items:center; gap:6px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        <span>Delete Row</span>
+      </button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" onclick="closeEditScanModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditScanModal()">&#10003; Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container"></div>
 
@@ -2635,15 +2688,117 @@ async function triggerScanSimulation() {
   btn.innerHTML = `${scanSvg}<span>SCAN</span>`;
 }
 
+let currentEditingScanIdx = null;
+
 function editScanRow(idx) {
   const row = DB.scans[idx];
-  const input = prompt('Edit serials for ' + row.model + ' (comma-separated):', row.serials.join(', '));
-  if (input !== null) {
-    row.serials = input.split(',').map(s => s.trim()).filter(Boolean);
-    row.qty = row.serials.length + ' PC' + (row.serials.length > 1 ? 'S' : '');
-    renderScanResultsTable();
-    showToast('Updated ' + row.model);
+  if (!row) return;
+  currentEditingScanIdx = idx;
+
+  document.getElementById('edit-scan-idx').value = idx;
+  document.getElementById('edit-scan-no').value = row.no !== undefined ? row.no : '';
+  document.getElementById('edit-scan-model').value = row.model || '';
+  document.getElementById('edit-scan-qty').value = row.qty || '';
+  document.getElementById('edit-scan-serials').value =
+    row.serials.length ? row.serials.join(', ') : (row.desc || '');
+
+  updateEditScanSerialCount();
+
+  const modal = document.getElementById('edit-scan-modal');
+  if (modal) {
+    modal.classList.add('open');
+    setTimeout(() => {
+      const modelInput = document.getElementById('edit-scan-model');
+      if (modelInput) modelInput.focus();
+    }, 50);
   }
+}
+
+function closeEditScanModal() {
+  const modal = document.getElementById('edit-scan-modal');
+  if (modal) modal.classList.remove('open');
+  currentEditingScanIdx = null;
+}
+
+function parseSerialsInput(text) {
+  if (!text) return [];
+  return text
+    .split(/[\n\r,;\s]+/)
+    .map(s => s.trim().replace(/^['"(,]+|[)'",]+$/g, ''))
+    .filter(Boolean);
+}
+
+function updateEditScanSerialCount() {
+  const text = document.getElementById('edit-scan-serials').value;
+  const serials = parseSerialsInput(text);
+  const countEl = document.getElementById('edit-scan-serials-count');
+  if (countEl) {
+    countEl.textContent = `${serials.length} serial${serials.length === 1 ? '' : 's'}`;
+  }
+  const qtyInput = document.getElementById('edit-scan-qty');
+  if (qtyInput && (!qtyInput.value || qtyInput.value.includes('PC'))) {
+    if (serials.length > 0) {
+      qtyInput.value = `${serials.length} PC${serials.length > 1 ? 'S' : ''}`;
+    }
+  }
+}
+
+function formatEditScanSerials() {
+  const text = document.getElementById('edit-scan-serials').value;
+  const serials = parseSerialsInput(text);
+  document.getElementById('edit-scan-serials').value = serials.join(', ');
+  updateEditScanSerialCount();
+  showToast(`Formatted ${serials.length} serial numbers.`);
+}
+
+function saveEditScanModal() {
+  if (currentEditingScanIdx === null || !DB.scans[currentEditingScanIdx]) {
+    closeEditScanModal();
+    return;
+  }
+
+  const row = DB.scans[currentEditingScanIdx];
+  const noVal = document.getElementById('edit-scan-no').value.trim();
+  const modelVal = document.getElementById('edit-scan-model').value.trim().toUpperCase();
+  const qtyVal = document.getElementById('edit-scan-qty').value.trim();
+  const rawSerialsText = document.getElementById('edit-scan-serials').value.trim();
+  const parsedSerials = parseSerialsInput(rawSerialsText).map(s => s.toUpperCase());
+
+  if (!modelVal) {
+    showToast('Please specify a Model name.', '&#9888;');
+    return;
+  }
+
+  if (noVal !== '') {
+    row.no = isNaN(Number(noVal)) ? noVal : Number(noVal);
+  }
+  row.model = modelVal;
+  row.serials = parsedSerials;
+  if (parsedSerials.length === 0 && rawSerialsText) {
+    row.desc = rawSerialsText;
+  } else {
+    delete row.desc;
+  }
+  row.qty = qtyVal || (parsedSerials.length
+    ? `${parsedSerials.length} PC${parsedSerials.length > 1 ? 'S' : ''}`
+    : '0 PC');
+
+  renderScanResultsTable();
+  closeEditScanModal();
+  showToast(`Updated No. ${row.no} \u00b7 ${row.model}`);
+}
+
+function deleteCurrentScanRow() {
+  if (currentEditingScanIdx === null || !DB.scans[currentEditingScanIdx]) {
+    closeEditScanModal();
+    return;
+  }
+  const row = DB.scans[currentEditingScanIdx];
+  const itemLabel = `No. ${row.no || ''} (${row.model || 'item'})`;
+  DB.scans.splice(currentEditingScanIdx, 1);
+  renderScanResultsTable();
+  closeEditScanModal();
+  showToast(`Deleted ${itemLabel}`, '&#128465;');
 }
 
 function addScanRowManual() {
@@ -3397,9 +3552,17 @@ async function applyConfigSettings() {
 }
 
 /* Keyboard escape listener & modal backdrop click */
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeConfigModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeConfigModal();
+    closeEditScanModal();
+  }
+});
 document.getElementById('config-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('config-modal')) closeConfigModal();
+});
+document.getElementById('edit-scan-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('edit-scan-modal')) closeEditScanModal();
 });
 
 /* Day / Dark Theme toggle with state persistence */
