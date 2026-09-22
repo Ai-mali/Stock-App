@@ -53,20 +53,28 @@ PROVIDERS = {
     },
 }
 
-PROMPT = """Extract model number and serial number from this Daikin equipment parts list.
+PROMPT = """Extract model numbers and serial numbers from this Daikin equipment parts list.
 No = the line item number in the leftmost No column.
-Model = equipment model code from the Material column.
-Serial = serial number after Serial No:.
-If multiple serial numbers for same model, separate with comma.
-Keep serial ranges as written, e.g. "K016634 - K016636".
+Model = equipment model code from the Material column (e.g. BCR50FF, FTKU60AV1F).
+Serial = every serial number after "Serial No:" — copy each one exactly as
+printed, comma-separated. Keep ranges as written, e.g. "K016634 - K016636".
 Desc = the description text of the line item.
 Qty = quantity number from the Quantity column.
-Ignore handwritten checkmarks next to serials.
-If a row's Material/model is cut off or belongs to a previous page, still
-return the serials with model left empty.
-Return ONLY JSON array, one object per row including rows without serials:
+Rules:
+- Each "Serial No:" block belongs ONLY to the row it is printed under.
+  NEVER merge serials from different rows and never move serials to a
+  neighboring row, even if two blocks look similar.
+- If a serial block's row has no Material/model code (blank cell, cut off,
+  or continued from a previous page), return it as its OWN row with model
+  left EMPTY — do not attach those serials to another model.
+- If a row has a model but no Serial No, return it with serial empty and
+  put its description text in desc.
+- If a row has a model AND a description AND a Serial No block, put the
+  description in desc and the serials in serial.
+- Do not invent or drop serials: copy every one that is printed.
+- Ignore handwritten checkmarks, ticks, and pen annotations.
+Return ONLY a JSON array, one object per row, including rows without serials:
 [{"no":"","model":"","serial":"","qty":"","desc":""}]
-Leave serial empty when the row has no serial number.
 """
 
 _RANGE_RE = re.compile(
@@ -262,13 +270,41 @@ def parse_scan_json(raw: str) -> list[dict]:
         if not (model or raw_serial or desc):
             continue
         serial, flag = _resolve_serials(raw_serial, qty)
+        if not raw_serial:
+            flag = "no_serial"
         if not model:
             flag = flag or "no_model"
         serials = [s.strip().upper() for s in serial.split(",") if s.strip()]
+        sev, warn = _flag_detail(flag, len(serials), qty)
         rows.append({"no": no, "model": model.upper(), "qty": qty,
                      "serial": serial.upper(), "serials": serials,
-                     "desc": desc, "flag": flag or ""})
+                     "desc": desc, "flag": flag or "",
+                     "sev": sev, "warn": warn})
     return rows
+
+
+def _flag_detail(flag: str, n_serials: int, qty: str) -> tuple:
+    """Map a flag code to (severity, human-readable message)."""
+    parts, sev = [], ""
+    q = _qty_int(qty)
+    if flag == "qty_mismatch":
+        parts.append(f"{n_serials} serials captured but Qty declares "
+                     f"{q or '?'} — serials may be missing or merged from "
+                     "another row")
+        sev = "error"
+    elif flag == "qty_fixed":
+        parts.append("dash separators were treated as separate serials "
+                     f"to match the declared Qty {q or '?'} — please verify")
+        sev = "warn"
+    if flag == "no_serial":
+        parts.append("no serial number on this row — description captured "
+                     "instead; still usable")
+        sev = sev or "warn"
+    if flag == "no_model":
+        parts.append("no model name on this row — assign a model before "
+                     "committing")
+        sev = "error"
+    return sev, "; ".join(parts)
 
 
 def _resolve_serials(raw_serial: str, qty: str) -> tuple:
