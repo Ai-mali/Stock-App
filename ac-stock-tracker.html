@@ -1173,6 +1173,8 @@ body.theme-light .btn-preview-action.btn-clear:hover {
 }
 
 /* --- Scan row warnings --- */
+tr.scan-row-error td { background: rgba(248, 113, 113, 0.07); }
+tr.scan-row-warn td { background: rgba(240, 180, 41, 0.06); }
 .scan-warn-icon.warn-red {
   color: #f87171;
   background: rgba(248, 113, 113, 0.12);
@@ -2560,6 +2562,8 @@ function renderScanResultsTable() {
       : '';
 
     const tr = document.createElement('tr');
+    if (row.sev === 'error') tr.className = 'scan-row-error';
+    else if (row.sev === 'warn') tr.className = 'scan-row-warn';
     tr.innerHTML = `
       <td class="mono" style="color:var(--text-sub); text-align:center; width:44px;">${row.no}</td>
       <td style="font-weight:700; white-space:nowrap; width:130px;">${row.model || '<span style="color:var(--text-muted);">\u2014</span>'}</td>
@@ -2729,7 +2733,8 @@ async function triggerScanSimulation() {
     if (res.ok) {
       DB.scans = res.rows.map(r => ({
         no: r.no, model: r.model, serials: r.serials,
-        qty: r.qty, flag: r.flag || '', desc: r.desc || ''
+        qty: r.qty, flag: r.flag || '', desc: r.desc || '',
+        sev: r.sev || '', warn: r.warn || ''
       }));
       renderScanResultsTable();
       showToast(`Scan complete! ${res.rows.length} rows extracted.`);
