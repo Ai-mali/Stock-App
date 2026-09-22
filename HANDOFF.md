@@ -26,7 +26,6 @@ serves both at `http://localhost:8000`.
 | `backend.py` | FastAPI app: serves the HTML at `/` + `/ac-stock-tracker.html`, plus all `/api/*` endpoints. Auto-opens the browser. |
 | `scanner.py` | Vision engine: `PROVIDERS` dict (gemini/alibaba/openai/anthropic/deepseek), `PROMPT` sent to the vision model, `parse_scan_json`, per-provider scanners with **multi-key failover**, `list_models` (live model fetch with static fallback). |
 | `stock_store.py` | `StockStore` — openpyxl layer over `daikin_stock.xlsx`. Sheets: `MasterRecord` `Supplier\|Brand\|Model\|Serial\|Date In\|Status\|Customer\|Date Out` (one row per serial), `Brands`, `ModelBrands` (exact Model→Brand), `Returns` `Serial\|Model\|Customer\|Reason\|Condition\|Notes\|Action\|Date`, and `ActivityLog` `Timestamp\|Action\|Model\|Serials Count\|Details\|Status`. Automatic rotating backups in `backups/`, customer history ranking, and warranty tracking. |
-| `build_exe.py`, `build_exe.bat` | PyInstaller packaging script & Windows launcher that bundles backend + HTML into standalone `.exe`. |
 | `requirements.txt` | `fastapi, uvicorn, python-multipart, google-genai, openpyxl` |
 | `git-pull.bat`, `run.bat` | Owner's helpers (`git pull` / `python backend.py`). |
 | `extractor_flowchart.html` | Old flowchart doc — informational only. |
@@ -124,9 +123,7 @@ desc, or no model, are skipped/blocked.
    - Track List displays `Active (Xd left)`, `Expiring Soon (Xd left)`, or `Expired` badges.
    - Warranty filter pills in Track List (`All Warranty`, `🛡️ Active`, `⚠️ Expiring Soon`, `❌ Expired`) and CSV export inclusion.
    - Return (RMA) screen shows live warranty status banner for selected serial.
-6. [DONE] **PyInstaller packaging (.exe)**:
-   - `build_exe.py` and `build_exe.bat` build standalone `dist/DaikinStockTracker.exe`.
-   - Resolves `sys._MEIPASS` for embedded `ac-stock-tracker.html` while keeping persistent `daikin_stock.xlsx` and `backups/` in the user's application directory next to the executable.
+6. **Final step: PyInstaller `.exe` packaging** — deferred until all upgrades and new features are finished as requested by the owner. Keep repo and folder clean until that final step.
 
 
 Owner instruction that still applies: *"the most important is you have
