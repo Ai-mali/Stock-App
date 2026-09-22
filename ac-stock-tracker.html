@@ -1179,11 +1179,13 @@ tr.key-row.drop-target td { border-top: 2px solid var(--green-bright); }
 .drag-handle {
   cursor: grab;
   color: var(--text-muted);
-  font-size: 15px;
   text-align: center;
   user-select: none;
   width: 26px;
+  vertical-align: middle;
 }
+.drag-handle:hover { color: var(--green-bright); }
+.drag-handle svg { display: inline-block; vertical-align: middle; }
 tr.key-row:active .drag-handle { cursor: grabbing; }
 
 .btn-action-icon {
@@ -3558,7 +3560,9 @@ function renderProviderKeys(prov) {
     tr.dataset.idx = idx;
     tr.draggable = true;
     tr.innerHTML = `
-      <td class="drag-handle" title="Drag to reorder — top key is used first">\u2807</td>
+      <td class="drag-handle" title="Drag to reorder — top key is used first">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </td>
       <td><span class="badge badge-green" style="font-size:10px;">${provLabel(prov)}</span></td>
       <td class="mono" style="color:var(--text-muted);">${k.masked}</td>
       <td><span style="color:var(--green-bright); font-weight:700; font-size:11px;">${idx === 0 ? 'PRIMARY' : 'FAILOVER'}</span></td>
