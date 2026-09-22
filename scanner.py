@@ -72,6 +72,9 @@ Rules:
 - If a row has a model AND a description AND a Serial No block, put the
   description in desc and the serials in serial.
 - Do not invent or drop serials: copy every one that is printed.
+- Serials are codes containing digits (e.g. K000361, E030850). Words
+  without digits (DAIKIN, REFNET, JOINT, KIT, WIFI, CASSETTE, MULTI,
+  VRV) are description text — put them in desc, NEVER in serial.
 - Ignore handwritten checkmarks, ticks, and pen annotations.
 Return ONLY a JSON array, one object per row, including rows without serials:
 [{"no":"","model":"","serial":"","qty":"","desc":""}]
@@ -275,9 +278,19 @@ def parse_scan_json(raw: str) -> list[dict]:
         if not model:
             flag = flag or "no_model"
         serials = [s.strip().upper() for s in serial.split(",") if s.strip()]
+        # description words the model placed in serial (no digits)
+        # belong in desc, not the serial list
+        real = [s for s in serials if any(c.isdigit() for c in s)]
+        words = [s for s in serials if s not in real]
+        if words:
+            extra = " ".join(words)
+            desc = f"{desc} {extra}".strip() if desc else extra
+            serials = real
+            if not serials:
+                flag = "no_serial"
         sev, warn = _flag_detail(flag, len(serials), qty)
         rows.append({"no": no, "model": model.upper(), "qty": qty,
-                     "serial": serial.upper(), "serials": serials,
+                     "serial": ", ".join(serials), "serials": serials,
                      "desc": desc, "flag": flag or "",
                      "sev": sev, "warn": warn})
     return rows

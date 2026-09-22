@@ -2933,10 +2933,20 @@ function reportCommit(row, res) {
   }
 }
 
+// serials to send for a scan row: real serials, or the description as the
+// unit identifier for serial-less parts (expanded when Qty > 1)
+function commitSerialsOf(row) {
+  if (row.serials.length) return row.serials;
+  if (!row.desc) return [];
+  const q = parseInt((String(row.qty).match(/\d+/) || [])[0] || '1', 10) || 1;
+  return q > 1 ? Array.from({ length: q }, (_, i) => `${row.desc} #${i + 1}`)
+               : [row.desc];
+}
+
 async function commitScanRow(idx) {
   const row = DB.scans[idx];
   if (!row) return;
-  if (!row.serials.length) {
+  if (!row.serials.length && !row.desc) {
     showToast('Row has no serials \u2014 edit it first.');
     return;
   }
@@ -2946,7 +2956,7 @@ async function commitScanRow(idx) {
   }
   try {
     const res = await apiPost('/api/stock-in', {
-      ...scanBatchFields(), model: row.model, serials: row.serials
+      ...scanBatchFields(), model: row.model, serials: commitSerialsOf(row)
     });
     if (res.needs_brand) {
       const brand = await askBrand(row.model);
@@ -2971,10 +2981,10 @@ async function commitAllScansToStock() {
   let i = 0;
   while (i < DB.scans.length) {
     const row = DB.scans[i];
-    if (!row.serials.length || !row.model) { skipped++; i++; continue; }
+    if ((!row.serials.length && !row.desc) || !row.model) { skipped++; i++; continue; }
     try {
       const res = await apiPost('/api/stock-in', {
-        ...scanBatchFields(), model: row.model, serials: row.serials
+        ...scanBatchFields(), model: row.model, serials: commitSerialsOf(row)
       });
       if (res.needs_brand) {
         const brand = await askBrand(row.model);
