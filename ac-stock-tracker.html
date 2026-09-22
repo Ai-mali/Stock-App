@@ -2871,6 +2871,18 @@ function saveEditScanModal() {
     ? `${parsedSerials.length} PC${parsedSerials.length > 1 ? 'S' : ''}`
     : '0 PC');
 
+  // manual save resolves existing warnings; re-flag only if the
+  // underlying problem is still true
+  row.flag = ''; row.sev = ''; row.warn = '';
+  const declaredQty = parseInt((row.qty.match(/(\d+)/) || [])[1] || '0', 10);
+  if (parsedSerials.length === 0) {
+    row.flag = 'no_serial'; row.sev = 'warn';
+    row.warn = 'no serial number on this row — description captured instead; still usable';
+  } else if (declaredQty && declaredQty !== parsedSerials.length) {
+    row.flag = 'qty_mismatch'; row.sev = 'error';
+    row.warn = `${parsedSerials.length} serials captured but Qty declares ${declaredQty} — serials may be missing or merged from another row`;
+  }
+
   renderScanResultsTable();
   closeEditScanModal();
   showToast(`Updated No. ${row.no} \u00b7 ${row.model}`);
