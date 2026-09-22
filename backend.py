@@ -22,8 +22,10 @@ from pydantic import BaseModel
 import scanner
 from stock_store import StockStore
 
-BASE = Path(__file__).parent
+BASE = Path(getattr(sys, "_MEIPASS", Path(__file__).parent))
 HTML_PATH = BASE / "ac-stock-tracker.html"
+if not HTML_PATH.exists():
+    HTML_PATH = Path(__file__).parent / "ac-stock-tracker.html"
 
 app = FastAPI(title="AC Stock Tracker")
 store = StockStore()
@@ -105,6 +107,60 @@ def returns():
 def brands():
     _fresh()
     return {"brands": store.brands}
+
+
+@app.get("/api/customers")
+def customers():
+    _fresh()
+    return {"customers": store.customer_history()}
+
+
+# ------------------------------------------------------------------ activity & backups
+@app.get("/api/activity")
+def get_activity(limit: int = 100):
+    _fresh()
+    return {"records": store.activity_log(limit=limit)}
+
+
+@app.get("/api/backups")
+def get_backups():
+    return {"backups": store.list_backups()}
+
+
+@app.post("/api/backup")
+def trigger_backup():
+    _fresh()
+    bk = store.manual_backup()
+    _saved()
+    return {"ok": True, "backup": bk}
+
+
+class RestoreBody(BaseModel):
+    filename: str
+
+
+@app.post("/api/restore")
+def restore_backup(body: RestoreBody):
+    ok, err = store.restore_backup(body.filename)
+    if not ok:
+        return JSONResponse({"ok": False, "error": err}, status_code=400)
+    _saved()
+    return {"ok": True}
+
+
+@app.get("/api/backup/download")
+def download_backup(filename: str = ""):
+    if filename:
+        from stock_store import BACKUP_DIR
+        safe_name = Path(filename).name
+        target = BACKUP_DIR / safe_name
+        if not target.exists():
+            return JSONResponse({"ok": False, "error": "File not found"}, status_code=404)
+        return FileResponse(target, filename=safe_name, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    _fresh()
+    if not store.path.exists():
+        return JSONResponse({"ok": False, "error": "Workbook does not exist yet"}, status_code=404)
+    return FileResponse(store.path, filename="daikin_stock.xlsx", media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # ------------------------------------------------------------------ stock
@@ -292,6 +348,8 @@ def remove_key(provider: str, index: int):
 
 # ------------------------------------------------------------------ run
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     import uvicorn
 
     threading.Timer(1.0,

@@ -1771,6 +1771,168 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Badge amber & blue */
+.badge-amber {
+  background: rgba(217, 119, 6, 0.15);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  color: #f59e0b;
+}
+body.theme-light .badge-amber {
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  color: #b45309;
+}
+.badge-blue {
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  color: #38bdf8;
+}
+body.theme-light .badge-blue {
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  color: #2563eb;
+}
+
+/* Low Stock Alert Banner */
+.low-stock-banner {
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.28);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+body.theme-light .low-stock-banner {
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.25);
+}
+
+/* Autocomplete Dropdown */
+.autocomplete-wrap {
+  position: relative;
+  width: 100%;
+}
+.autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface2);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+}
+body.theme-light .autocomplete-dropdown {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+.autocomplete-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text);
+  transition: background .12s;
+}
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+.autocomplete-item:hover, .autocomplete-item.active {
+  background: var(--surface3);
+  color: var(--green-bright);
+}
+.autocomplete-meta {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Quick chips */
+.quick-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.quick-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.quick-chip:hover {
+  border-color: var(--green-bright);
+  color: var(--text);
+  background: var(--surface2);
+}
+
+/* Warranty Alert Card in RMA */
+.warranty-alert-card {
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  margin-top: 8px;
+  transition: all .2s;
+}
+.warranty-alert-card.active {
+  background: var(--green-badge-bg);
+  border: 1px solid var(--green-badge-border);
+  color: var(--green-bright);
+}
+.warranty-alert-card.expiring {
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  color: #f59e0b;
+}
+.warranty-alert-card.expired {
+  background: var(--red-badge-bg);
+  border: 1px solid var(--red-badge-border);
+  color: var(--red-badge-text);
+}
+
+/* Activity Modal Subtabs */
+.modal-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+}
+.modal-tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.modal-tab-btn.active {
+  background: var(--surface3);
+  color: var(--text);
+}
+.modal-tab-btn:hover:not(.active) {
+  color: var(--text);
+}
 </style>
 </head>
 <body>
@@ -1820,6 +1982,10 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
         </span>
         <span class="theme-icon moon-icon">&#9790;</span>
         <span class="theme-mode-label" id="theme-mode-text">Dark</span>
+      </button>
+      <!-- Backup & Activity Log Button -->
+      <button class="icon-square-btn" onclick="openActivityModal()" title="Database Backups & Activity Log">
+        &#9201;
       </button>
       <button class="icon-square-btn" onclick="downloadCurrentHtml()" title="Download Clean Single-File HTML">
         &#11015;
@@ -2047,8 +2213,16 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
             <div id="cart-items-container" style="min-height:80px; max-height:260px; overflow-y:auto;"></div>
             <div style="height:1px; background:var(--border);"></div>
             <div>
-              <label class="form-label">Customer / Client Name *</label>
-              <input type="text" class="form-input" id="cart-customer" value="Neath Air Conditioning Ltd">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label class="form-label" style="margin-bottom:0;">Customer / Client Name *</label>
+                <span id="customer-type-tag"></span>
+              </div>
+              <div class="autocomplete-wrap">
+                <input type="text" class="form-input" id="cart-customer" value="Neath Air Conditioning Ltd" autocomplete="off" oninput="handleCustomerInput(this.value)" onfocus="handleCustomerFocus()" onkeydown="handleCustomerKeydown(event)" placeholder="Type or select customer...">
+                <div class="autocomplete-dropdown" id="cart-customer-dropdown"></div>
+              </div>
+              <!-- Quick Select Recent Customers -->
+              <div class="quick-chips-row" id="recent-customers-chips"></div>
             </div>
             <div>
               <label class="form-label">Date Out</label>
@@ -2075,7 +2249,10 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
       </div>
 
       <!-- Customer Filter Pills -->
-      <div class="filter-pills-row" id="track-customer-pills" style="margin-bottom:14px;"></div>
+      <div class="filter-pills-row" id="track-customer-pills" style="margin-bottom:8px;"></div>
+
+      <!-- Warranty Filter Pills -->
+      <div class="filter-pills-row" id="track-warranty-pills" style="margin-bottom:14px;"></div>
 
       <!-- Customer Summary Banner -->
       <div class="track-customer-banner">
@@ -2112,6 +2289,7 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
                 <th>DATE IN</th>
                 <th>DISPATCHED AT</th>
                 <th>CUSTOMER DESTINATION</th>
+                <th>WARRANTY</th>
                 <th style="text-align:right;">STATUS</th>
               </tr>
             </thead>
@@ -2140,7 +2318,8 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
           <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
             <div>
               <label class="form-label">Select Dispatched Serial</label>
-              <select class="form-select" id="rma-serial-select"></select>
+              <select class="form-select" id="rma-serial-select" onchange="updateRmaWarrantyCard()"></select>
+              <div id="rma-warranty-card" style="display:none;"></div>
             </div>
             <div>
               <label class="form-label">Return Reason</label>
@@ -2375,6 +2554,94 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
   </div>
 </div>
 
+<!-- DATABASE ACTIVITY & BACKUPS MODAL -->
+<div class="modal-overlay" id="activity-modal">
+  <div class="modal-dialog" style="max-width: 840px; max-height: 85vh; display:flex; flex-direction:column;">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Database Activity &amp; Backups</div>
+        <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">
+          daikin_stock.xlsx &middot; Automatic snapshot history &amp; transaction audit log
+        </div>
+      </div>
+      <button class="btn-circle" onclick="closeActivityModal()" title="Close">&#10005;</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto; flex:1; padding-bottom:10px;">
+      <!-- Modal Subtabs -->
+      <div class="modal-tabs">
+        <button class="modal-tab-btn active" id="btn-act-tab-history" onclick="switchActivityModalTab('history')">
+          Activity History
+        </button>
+        <button class="modal-tab-btn" id="btn-act-tab-backups" onclick="switchActivityModalTab('backups')">
+          Backups &amp; Snapshots
+        </button>
+      </div>
+
+      <!-- Tab 1: Activity History -->
+      <div id="act-panel-history">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px;">
+          <input type="text" id="act-search" class="form-input" style="max-width:280px; padding:6px 12px; font-size:12px;" placeholder="Search activity..." oninput="renderActivityTable(this.value)">
+          <button class="btn btn-ghost btn-sm" onclick="fetchActivityLog(true)">&#8635; Refresh Log</button>
+        </div>
+        <div class="table-container" style="max-height:380px; overflow-y:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>TIMESTAMP</th>
+                <th>ACTION</th>
+                <th>MODEL</th>
+                <th>UNITS</th>
+                <th>DETAILS</th>
+                <th style="text-align:right;">STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="act-table-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 2: Backups -->
+      <div id="act-panel-backups" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; background:var(--surface3); padding:12px 16px; border-radius:8px;">
+          <div>
+            <div style="font-weight:700; font-size:13px;">Create Instant Snapshot</div>
+            <div style="font-size:11px; color:var(--text-sub);">Safe manual snapshot saved to local backups directory</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <a href="/api/backup/download" class="btn btn-ghost btn-sm" style="text-decoration:none; display:inline-flex; align-items:center;" title="Download active Excel file">
+              &#11015; Download Active .xlsx
+            </a>
+            <button class="btn btn-primary btn-sm" onclick="triggerManualBackup()">
+              &#128190; Backup Now
+            </button>
+          </div>
+        </div>
+
+        <div style="font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">
+          AVAILABLE SNAPSHOTS (MAX 30 AUTO-ROTATING)
+        </div>
+        <div class="table-container" style="max-height:320px; overflow-y:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>BACKUP FILE</th>
+                <th>CREATED</th>
+                <th>SIZE</th>
+                <th style="text-align:right;">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="backups-table-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="font-size:11px; color:var(--text-sub);" id="act-modal-footer-text">Auto-backup enabled before every change</span>
+      <button class="btn btn-ghost" onclick="closeActivityModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container"></div>
 
@@ -2387,12 +2654,17 @@ const DB = {
   availFilter: 'ALL',
   soFilter: 'ALL',
   trackFilter: 'ALL',
+  trackWarrantyFilter: 'ALL', // 'ALL' | 'active' | 'expiring' | 'expired'
+  lowStockFilter: false,      // toggles showing only models with <= 2 units
   scans: [],        // filled by POST /api/scan or the manual + button
   inventory: {},    // GET /api/inventory  (brand -> models -> serials)
   stagedCart: [],   // client-side staging; POST /api/stock-out on checkout
   trackList: [],    // GET /api/track       (sold units)
   returns: [],      // GET /api/returns
   brands: [],       // from /api/inventory
+  customers: [],    // GET /api/customers
+  activities: [],   // GET /api/activity
+  backups: [],      // GET /api/backups
   photoFile: null,  // File picked for scanning
   config: null,     // GET /api/config      (active provider/model)
 };
@@ -2415,16 +2687,22 @@ const apiDel = (p, body) => api(p, {
 });
 
 async function refreshData() {
-  const [inv, trk, ret] = await Promise.all([
-    apiGet('/api/inventory'), apiGet('/api/track'), apiGet('/api/returns')
+  const [inv, trk, ret, cust] = await Promise.all([
+    apiGet('/api/inventory'),
+    apiGet('/api/track'),
+    apiGet('/api/returns'),
+    apiGet('/api/customers').catch(() => ({ customers: [] }))
   ]);
   DB.inventory = inv.inventory;
   DB.brands = inv.brands;
   DB.trackList = trk.records;
   DB.returns = ret.records;
+  DB.customers = cust.customers || [];
   renderBrandPills();
   renderAll();
   updateGlobalBadges();
+  renderRecentCustomerChips();
+  checkCustomerInputStatus();
 }
 
 function renderAll() {
@@ -3081,12 +3359,51 @@ function setAvailFilter(filter) {
   renderAvailable();
 }
 
+function toggleLowStockFilter() {
+  DB.lowStockFilter = !DB.lowStockFilter;
+  renderAvailable();
+}
+
 function renderAvailable(searchTerm = '') {
   const container = document.getElementById('avail-accordion-container');
   container.innerHTML = '';
 
   const q = searchTerm.trim().toLowerCase();
   const brands = DB.availFilter === 'ALL' ? Object.keys(DB.inventory) : [DB.availFilter].filter(b => DB.inventory[b]);
+
+  // Check low-stock models across entire inventory
+  let lowStockModels = [];
+  for (const bKey in DB.inventory) {
+    const bData = DB.inventory[bKey];
+    for (const mKey in bData.models) {
+      const sCount = bData.models[mKey].serials.length;
+      if (sCount <= 2) {
+        lowStockModels.push({ brand: bKey, model: mKey, count: sCount });
+      }
+    }
+  }
+
+  if (lowStockModels.length > 0) {
+    const banner = document.createElement('div');
+    banner.className = 'low-stock-banner';
+    banner.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:18px;">⚠️</span>
+        <div>
+          <div style="font-weight:700; color:#f59e0b; font-size:12.5px;">
+            Low Stock Notice &middot; ${lowStockModels.length} Model${lowStockModels.length > 1 ? 's' : ''} have &le; 2 units remaining
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+            Consider reordering or restocking soon to prevent order delays.
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="toggleLowStockFilter()" style="white-space:nowrap;">
+        ${DB.lowStockFilter ? '&#10005; Show All Inventory' : '⚡ View Low Stock Only'}
+      </button>
+    `;
+    container.appendChild(banner);
+  }
 
   brands.forEach(brandKey => {
     const bData = DB.inventory[brandKey];
@@ -3096,6 +3413,7 @@ function renderAvailable(searchTerm = '') {
     for (const mKey in bData.models) {
       const mData = bData.models[mKey];
       let serials = mData.serials;
+      if (DB.lowStockFilter && serials.length > 2) continue;
       if (q) {
         serials = serials.filter(s => s.toLowerCase().includes(q) || mKey.toLowerCase().includes(q));
         if (serials.length === 0) continue;
@@ -3119,6 +3437,17 @@ function renderAvailable(searchTerm = '') {
         `;
       }).join('');
 
+      const count = serials.length;
+      let badgeClass = 'badge-green';
+      let badgeText = `${count} In Stock`;
+      if (count === 0) {
+        badgeClass = 'badge-red';
+        badgeText = 'Out of Stock (0)';
+      } else if (count <= 2) {
+        badgeClass = 'badge-amber';
+        badgeText = `⚠️ Low Stock: ${count}`;
+      }
+
       modelsHtml += `
         <div class="model-accordion">
           <div class="model-accordion-header" onclick="toggleModelAcc('${brandKey}', '${mKey}')">
@@ -3127,7 +3456,7 @@ function renderAvailable(searchTerm = '') {
               <span style="font-weight:700; font-size:12.5px;">${mKey}</span>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
-              <span class="badge badge-green">${serials.length} In Stock</span>
+              <span class="badge ${badgeClass}">${badgeText}</span>
               <span style="color:var(--text-sub);">${mData.open ? '&#9650;' : '&#9660;'}</span>
             </div>
           </div>
@@ -3138,7 +3467,7 @@ function renderAvailable(searchTerm = '') {
       `;
     }
 
-    if (!modelsHtml && q) return;
+    if (!modelsHtml && (q || DB.lowStockFilter)) return;
 
     const brandSection = document.createElement('div');
     brandSection.className = 'brand-accordion';
@@ -3221,18 +3550,28 @@ function renderStockOut(searchTerm = '') {
         `;
       }).join('');
 
-      modelsHtml += `
-        <div class="model-accordion">
-          <div class="model-accordion-header" onclick="toggleSOModelAcc('${brandKey}', '${mKey}')">
-            <div style="display:flex; align-items:center;">
-              <span class="model-index-pill">${mData.idx || '01'}</span>
-              <span style="font-weight:700; font-size:12.5px;">${mKey}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span class="badge badge-green">${serials.length} In Stock</span>
-              <span style="color:var(--text-sub);">${mData.open ? '&#9650;' : '&#9660;'}</span>
-            </div>
-          </div>
+            const soCount = serials.length;
+            let soBadgeClass = 'badge-green';
+            let soBadgeText = `${soCount} In Stock`;
+            if (soCount === 0) {
+              soBadgeClass = 'badge-red';
+              soBadgeText = 'Out of Stock (0)';
+            } else if (soCount <= 2) {
+              soBadgeClass = 'badge-amber';
+              soBadgeText = `⚠️ Low: ${soCount}`;
+            }
+            modelsHtml += `
+              <div class="model-accordion">
+                <div class="model-accordion-header" onclick="toggleSOModelAcc('${brandKey}', '${mKey}')">
+                  <div style="display:flex; align-items:center;">
+                    <span class="model-index-pill">${mData.idx || '01'}</span>
+                    <span style="font-weight:700; font-size:12.5px;">${mKey}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="badge ${soBadgeClass}">${soBadgeText}</span>
+                    <span style="color:var(--text-sub);">${mData.open ? '&#9650;' : '&#9660;'}</span>
+                  </div>
+                </div>
           <div style="display:${mData.open ? 'block' : 'none'};">
             <div style="padding:8px 14px 0 14px; font-size:11px; color:var(--text-sub);">
               Click any serial to quickly toggle in Dispatch Staging Cart:
@@ -3363,6 +3702,7 @@ async function processCartCheckout() {
    ========================================================= */
 function renderTrackList(searchTerm = '') {
   renderCustomerFilterPills();
+  renderWarrantyFilterPills();
 
   const q = searchTerm.trim().toLowerCase();
   let list = DB.trackList;
@@ -3371,11 +3711,16 @@ function renderTrackList(searchTerm = '') {
     list = list.filter(r => r.customer === DB.trackFilter);
   }
 
+  if (DB.trackWarrantyFilter && DB.trackWarrantyFilter !== 'ALL') {
+    list = list.filter(r => (r.warranty && r.warranty.status) === DB.trackWarrantyFilter);
+  }
+
   if (q) {
     list = list.filter(r => 
       r.serial.toLowerCase().includes(q) ||
       r.model.toLowerCase().includes(q) ||
-      r.customer.toLowerCase().includes(q)
+      r.customer.toLowerCase().includes(q) ||
+      (r.warranty && r.warranty.status.toLowerCase().includes(q))
     );
   }
 
@@ -3398,12 +3743,23 @@ function renderTrackList(searchTerm = '') {
 
   list.forEach(r => {
     const tr = document.createElement('tr');
+    const w = r.warranty || { status: 'none', expiry: '', daysRemaining: null };
+    let wBadge = '<span class="badge badge-neutral">\u2014</span>';
+    if (w.status === 'active') {
+      wBadge = `<span class="badge badge-green" title="Warranty expires ${w.expiry}">Active (${w.daysRemaining}d)</span>`;
+    } else if (w.status === 'expiring') {
+      wBadge = `<span class="badge badge-amber" title="Warranty expires ${w.expiry}">Expiring (${w.daysRemaining}d)</span>`;
+    } else if (w.status === 'expired') {
+      wBadge = `<span class="badge badge-red" title="Warranty expired ${w.expiry}">Expired</span>`;
+    }
+
     tr.innerHTML = `
       <td style="font-weight:700;">${r.model}</td>
       <td class="mono" style="color:var(--green-bright); font-weight:700;">${r.serial}</td>
       <td class="mono" style="color:var(--text-muted);">${r.dateIn}</td>
       <td class="mono" style="color:var(--text-muted);">${r.dateOut}</td>
       <td style="font-weight:500;">${r.customer}</td>
+      <td>${wBadge}</td>
       <td style="text-align:right;">
         <span class="badge badge-green">Dispatched</span>
       </td>
@@ -3414,11 +3770,14 @@ function renderTrackList(searchTerm = '') {
 
 function renderCustomerFilterPills() {
   const container = document.getElementById('track-customer-pills');
+  if (!container) return;
   container.innerHTML = '';
 
   const custMap = {};
   DB.trackList.forEach(r => {
-    custMap[r.customer] = (custMap[r.customer] || 0) + 1;
+    if (r.customer) {
+      custMap[r.customer] = (custMap[r.customer] || 0) + 1;
+    }
   });
 
   const allBtn = document.createElement('button');
@@ -3436,10 +3795,36 @@ function renderCustomerFilterPills() {
   }
 }
 
-function exportTrackCsv() {
-  let csv = 'MODEL,SERIAL NUMBER,DATE IN,DISPATCHED AT,CUSTOMER DESTINATION,STATUS\n';
+function renderWarrantyFilterPills() {
+  const container = document.getElementById('track-warranty-pills');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const wCounts = { ALL: DB.trackList.length, active: 0, expiring: 0, expired: 0 };
   DB.trackList.forEach(r => {
-    csv += `"${r.model}","${r.serial}","${r.dateIn}","${r.dateOut}","${r.customer}","Dispatched"\n`;
+    const s = (r.warranty && r.warranty.status) ? r.warranty.status : 'none';
+    if (wCounts[s] !== undefined) wCounts[s]++;
+  });
+
+  const mkPill = (key, label, count) => {
+    const btn = document.createElement('button');
+    btn.className = 'pill-filter-btn' + (DB.trackWarrantyFilter === key ? ' active' : '');
+    btn.innerHTML = `${label} <span class="tab-badge">${count}</span>`;
+    btn.onclick = () => { DB.trackWarrantyFilter = key; renderTrackList(); };
+    container.appendChild(btn);
+  };
+
+  mkPill('ALL', 'All Warranty', wCounts.ALL);
+  mkPill('active', '\ud83d\udee1\ufe0f Active', wCounts.active);
+  mkPill('expiring', '\u26a0\ufe0f Expiring Soon', wCounts.expiring);
+  mkPill('expired', '\u274c Expired', wCounts.expired);
+}
+
+function exportTrackCsv() {
+  let csv = 'MODEL,SERIAL NUMBER,DATE IN,DISPATCHED AT,CUSTOMER DESTINATION,WARRANTY STATUS,WARRANTY EXPIRY,STATUS\n';
+  DB.trackList.forEach(r => {
+    const w = r.warranty || { status: '', expiry: '' };
+    csv += `"${r.model}","${r.serial}","${r.dateIn}","${r.dateOut}","${r.customer}","${w.status}","${w.expiry}","Dispatched"\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
@@ -3464,11 +3849,41 @@ function renderReturnScreen() {
   DB.trackList.forEach(r => {
     const opt = document.createElement('option');
     opt.value = r.serial;
-    opt.textContent = `${r.serial} - ${r.model} (${r.customer})`;
+    const w = r.warranty;
+    const wTxt = w && w.status && w.status !== 'none' ? ` [${w.status.toUpperCase()}]` : '';
+    opt.textContent = `${r.serial} - ${r.model} (${r.customer})${wTxt}`;
     select.appendChild(opt);
   });
 
+  updateRmaWarrantyCard();
   renderReturnTable();
+}
+
+function updateRmaWarrantyCard() {
+  const card = document.getElementById('rma-warranty-card');
+  if (!card) return;
+  const sel = document.getElementById('rma-serial-select');
+  if (!sel || !sel.value) {
+    card.style.display = 'none';
+    return;
+  }
+  const rec = DB.trackList.find(r => r.serial === sel.value);
+  if (!rec || !rec.warranty || rec.warranty.status === 'none') {
+    card.style.display = 'none';
+    return;
+  }
+  const w = rec.warranty;
+  card.style.display = 'flex';
+  if (w.status === 'active') {
+    card.className = 'warranty-alert-card active';
+    card.innerHTML = `<span>\ud83d\udee1\ufe0f</span><div><strong>Under Active Warranty</strong> &middot; Valid until ${w.expiry} (${w.daysRemaining} days left)</div>`;
+  } else if (w.status === 'expiring') {
+    card.className = 'warranty-alert-card expiring';
+    card.innerHTML = `<span>\u26a0\ufe0f</span><div><strong>Warranty Expiring Soon</strong> &middot; ${w.daysRemaining} days remaining (Expires ${w.expiry})</div>`;
+  } else if (w.status === 'expired') {
+    card.className = 'warranty-alert-card expired';
+    card.innerHTML = `<span>\u274c</span><div><strong>Warranty Expired</strong> &middot; Expired on ${w.expiry} (${Math.abs(w.daysRemaining)} days ago)</div>`;
+  }
 }
 
 function renderReturnTable() {
@@ -3717,12 +4132,326 @@ async function applyConfigSettings() {
   }
 }
 
+/* =========================================================
+   7. CUSTOMER AUTOCOMPLETE & QUICK CHIPS LOGIC
+   ========================================================= */
+let customerSelectedIdx = -1;
+
+function getAllKnownCustomers() {
+  const map = new Map();
+  if (DB.customers && DB.customers.length) {
+    DB.customers.forEach(c => map.set(c.name.toLowerCase(), c));
+  }
+  DB.trackList.forEach(r => {
+    if (r.customer) {
+      const key = r.customer.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { name: r.customer, count: 1, lastDate: r.dateOut || '' });
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
+function checkCustomerInputStatus() {
+  const input = document.getElementById('cart-customer');
+  const tag = document.getElementById('customer-type-tag');
+  if (!input || !tag) return;
+  const val = input.value.trim();
+  if (!val) {
+    tag.innerHTML = '';
+    return;
+  }
+  const known = getAllKnownCustomers();
+  const found = known.find(c => c.name.toLowerCase() === val.toLowerCase());
+  if (found) {
+    tag.innerHTML = `<span class="badge badge-neutral" title="Past order history found">Known Customer</span>`;
+  } else {
+    tag.innerHTML = `<span class="badge badge-green" title="New customer destination">✦ New Customer</span>`;
+  }
+}
+
+function renderRecentCustomerChips() {
+  const wrap = document.getElementById('recent-customers-chips');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const known = getAllKnownCustomers();
+  if (!known.length) return;
+  const top4 = known.slice(0, 4);
+
+  const label = document.createElement('span');
+  label.style.fontSize = '10.5px';
+  label.style.color = 'var(--text-sub)';
+  label.style.alignSelf = 'center';
+  label.textContent = 'Recent:';
+  wrap.appendChild(label);
+
+  top4.forEach(c => {
+    const chip = document.createElement('span');
+    chip.className = 'quick-chip';
+    chip.textContent = c.name;
+    chip.title = `${c.count || 1} units previously dispatched`;
+    chip.onclick = () => selectCustomer(c.name);
+    wrap.appendChild(chip);
+  });
+}
+
+function handleCustomerInput(val) {
+  checkCustomerInputStatus();
+  customerSelectedIdx = -1;
+  const dropdown = document.getElementById('cart-customer-dropdown');
+  if (!dropdown) return;
+  const q = (val || '').trim().toLowerCase();
+  const known = getAllKnownCustomers();
+  const filtered = q ? known.filter(c => c.name.toLowerCase().includes(q)) : known.slice(0, 8);
+
+  if (!filtered.length) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  dropdown.innerHTML = '';
+  filtered.forEach((c, idx) => {
+    const item = document.createElement('div');
+    item.className = 'autocomplete-item';
+    item.dataset.index = idx;
+    item.dataset.name = c.name;
+    const countTxt = c.count ? `${c.count} units` : '';
+    const dateTxt = c.lastDate ? `Last: ${c.lastDate}` : '';
+    const metaStr = [countTxt, dateTxt].filter(Boolean).join(' · ');
+
+    item.innerHTML = `
+      <span style="font-weight:600;">${c.name}</span>
+      <span class="autocomplete-meta">${metaStr}</span>
+    `;
+    item.onmousedown = (e) => {
+      e.preventDefault(); // prevent input blur before click
+      selectCustomer(c.name);
+    };
+    dropdown.appendChild(item);
+  });
+  dropdown.style.display = 'block';
+}
+
+function handleCustomerFocus() {
+  const input = document.getElementById('cart-customer');
+  handleCustomerInput(input ? input.value : '');
+}
+
+function handleCustomerKeydown(e) {
+  const dropdown = document.getElementById('cart-customer-dropdown');
+  if (!dropdown || dropdown.style.display === 'none') return;
+  const items = dropdown.querySelectorAll('.autocomplete-item');
+  if (!items.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    customerSelectedIdx = (customerSelectedIdx + 1) % items.length;
+    updateDropdownActiveItem(items);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    customerSelectedIdx = (customerSelectedIdx - 1 + items.length) % items.length;
+    updateDropdownActiveItem(items);
+  } else if (e.key === 'Enter') {
+    if (customerSelectedIdx >= 0 && items[customerSelectedIdx]) {
+      e.preventDefault();
+      selectCustomer(items[customerSelectedIdx].dataset.name);
+    }
+  } else if (e.key === 'Escape') {
+    dropdown.style.display = 'none';
+  }
+}
+
+function updateDropdownActiveItem(items) {
+  items.forEach((it, i) => {
+    it.classList.toggle('active', i === customerSelectedIdx);
+    if (i === customerSelectedIdx) {
+      it.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+function selectCustomer(name) {
+  const input = document.getElementById('cart-customer');
+  if (input) input.value = name;
+  const dropdown = document.getElementById('cart-customer-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  checkCustomerInputStatus();
+}
+
+// Close autocomplete dropdown on click outside
+document.addEventListener('click', e => {
+  const wrap = e.target.closest('.autocomplete-wrap');
+  if (!wrap) {
+    const dropdown = document.getElementById('cart-customer-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+  }
+});
+
+/* =========================================================
+   8. DATABASE ACTIVITY LOG & BACKUPS MODAL LOGIC
+   ========================================================= */
+function openActivityModal() {
+  const m = document.getElementById('activity-modal');
+  if (m) m.classList.add('active');
+  switchActivityModalTab('history');
+  fetchActivityLog();
+  fetchBackups();
+}
+
+function closeActivityModal() {
+  const m = document.getElementById('activity-modal');
+  if (m) m.classList.remove('active');
+}
+
+function switchActivityModalTab(tab) {
+  const btnHist = document.getElementById('btn-act-tab-history');
+  const btnBk = document.getElementById('btn-act-tab-backups');
+  const pnlHist = document.getElementById('act-panel-history');
+  const pnlBk = document.getElementById('act-panel-backups');
+
+  if (tab === 'history') {
+    btnHist.classList.add('active');
+    btnBk.classList.remove('active');
+    pnlHist.style.display = 'block';
+    pnlBk.style.display = 'none';
+  } else {
+    btnHist.classList.remove('active');
+    btnBk.classList.add('active');
+    pnlHist.style.display = 'none';
+    pnlBk.style.display = 'block';
+    fetchBackups();
+  }
+}
+
+async function fetchActivityLog(notify = false) {
+  try {
+    const res = await apiGet('/api/activity?limit=100');
+    DB.activities = res.records || [];
+    renderActivityTable();
+    if (notify) showToast('Activity log refreshed');
+  } catch (e) {
+    showToast('Failed to load activity log: ' + e.message);
+  }
+}
+
+function renderActivityTable(searchTerm = '') {
+  const tbody = document.getElementById('act-table-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const q = (searchTerm || '').trim().toLowerCase();
+
+  let list = DB.activities || [];
+  if (q) {
+    list = list.filter(a => 
+      (a.Action && a.Action.toLowerCase().includes(q)) ||
+      (a.Model && a.Model.toLowerCase().includes(q)) ||
+      (a.Details && a.Details.toLowerCase().includes(q)) ||
+      (a.Timestamp && a.Timestamp.toLowerCase().includes(q))
+    );
+  }
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-sub); padding:24px;">No activity events recorded yet.</td></tr>`;
+    return;
+  }
+
+  list.forEach(a => {
+    const tr = document.createElement('tr');
+    let actBadge = '<span class="badge badge-neutral">' + (a.Action || 'Event') + '</span>';
+    if (a.Action === 'Stock In') actBadge = '<span class="badge badge-green">Stock In</span>';
+    else if (a.Action === 'Stock Out') actBadge = '<span class="badge badge-blue">Stock Out</span>';
+    else if (a.Action === 'Return') actBadge = '<span class="badge badge-amber">Return</span>';
+    else if (a.Action && a.Action.includes('Backup')) actBadge = '<span class="badge badge-neutral">💾 Backup</span>';
+    else if (a.Action === 'Brand Assigned') actBadge = '<span class="badge badge-neutral">Brand Map</span>';
+
+    tr.innerHTML = `
+      <td class="mono" style="font-size:11px; color:var(--text-muted);">${a.Timestamp || '—'}</td>
+      <td>${actBadge}</td>
+      <td style="font-weight:600;">${a.Model || '—'}</td>
+      <td class="mono">${a['Serials Count'] !== undefined ? a['Serials Count'] : '—'}</td>
+      <td style="color:var(--text); font-size:12px;">${a.Details || '—'}</td>
+      <td style="text-align:right;">
+        <span class="badge ${a.Status === 'OK' ? 'badge-green' : 'badge-red'}">${a.Status || 'OK'}</span>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function fetchBackups() {
+  try {
+    const res = await apiGet('/api/backups');
+    DB.backups = res.backups || [];
+    renderBackupsTable();
+  } catch (e) {
+    console.error('Failed to fetch backups', e);
+  }
+}
+
+function renderBackupsTable() {
+  const tbody = document.getElementById('backups-table-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (!DB.backups || !DB.backups.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-sub); padding:24px;">No snapshot files found in backups/ directory.</td></tr>`;
+    return;
+  }
+
+  DB.backups.forEach(b => {
+    const tr = document.createElement('tr');
+    const sizeKb = (b.size / 1024).toFixed(1) + ' KB';
+    tr.innerHTML = `
+      <td class="mono" style="font-weight:700; color:var(--green-bright);">${b.filename}</td>
+      <td class="mono" style="color:var(--text-muted); font-size:11px;">${b.modified}</td>
+      <td class="mono" style="color:var(--text-sub);">${sizeKb}</td>
+      <td style="text-align:right; white-space:nowrap;">
+        <a href="/api/backup/download?filename=${encodeURIComponent(b.filename)}" class="btn btn-ghost btn-sm" style="padding:4px 8px; text-decoration:none; display:inline-flex; align-items:center;" title="Download this snapshot">
+          ⬇ Download
+        </a>
+        <button class="btn btn-sm" style="padding:4px 8px; background:rgba(220,38,38,0.12); color:#f87171; border:1px solid rgba(220,38,38,0.3); margin-left:6px;" onclick="restoreBackupFile('${b.filename}')" title="Restore daikin_stock.xlsx from this snapshot">
+          ↺ Restore
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function triggerManualBackup() {
+  try {
+    const res = await apiPost('/api/backup', {});
+    showToast(`Backup created: ${res.backup.filename}`);
+    await fetchBackups();
+    await fetchActivityLog();
+  } catch (e) {
+    showToast('Backup failed: ' + e.message);
+  }
+}
+
+async function restoreBackupFile(filename) {
+  if (!confirm(`Are you sure you want to restore the database from '${filename}'?\n\nA safety snapshot of the current state will be taken before restoring.`)) {
+    return;
+  }
+  try {
+    await apiPost('/api/restore', { filename });
+    showToast(`Successfully restored from ${filename}!`);
+    await refreshData();
+    await fetchBackups();
+    await fetchActivityLog();
+  } catch (e) {
+    showToast('Restore failed: ' + e.message);
+  }
+}
+
 /* Keyboard escape listener & modal backdrop click */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeConfigModal();
     closeEditScanModal();
     closeZoomScanModal();
+    closeActivityModal();
   }
 });
 document.getElementById('config-modal').addEventListener('click', e => {
@@ -3733,6 +4462,9 @@ document.getElementById('edit-scan-modal').addEventListener('click', e => {
 });
 document.getElementById('zoom-scan-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('zoom-scan-modal')) closeZoomScanModal();
+});
+document.getElementById('activity-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('activity-modal')) closeActivityModal();
 });
 
 /* Day / Dark Theme toggle with state persistence */
