@@ -256,6 +256,27 @@ def _provider_payload(pid: str) -> dict:
                      for k in cfg["keys"]]}
 
 
+class KeyReorderBody(BaseModel):
+    provider: str
+    order: list[int]
+
+
+@app.post("/api/config/keys/reorder")
+def reorder_keys(body: KeyReorderBody):
+    providers = scanner.load_providers()
+    if body.provider not in providers:
+        return JSONResponse({"ok": False, "error": "unknown provider"},
+                            status_code=400)
+    keys = providers[body.provider]["keys"]
+    if sorted(body.order) != list(range(len(keys))):
+        return JSONResponse({"ok": False, "error": "order must be a "
+                             "permutation of all key indices"},
+                            status_code=400)
+    providers[body.provider]["keys"] = [keys[i] for i in body.order]
+    scanner.save_providers(providers)
+    return {"ok": True, "provider": _provider_payload(body.provider)}
+
+
 @app.delete("/api/config/keys")
 def remove_key(provider: str, index: int):
     providers = scanner.load_providers()

@@ -1172,6 +1172,20 @@ body.theme-light .btn-preview-action.btn-clear:hover {
   margin-right: 4px;
 }
 
+/* --- API key drag-to-reorder --- */
+tr.key-row { transition: opacity .15s; }
+tr.key-row.dragging { opacity: .35; }
+tr.key-row.drop-target td { border-top: 2px solid var(--green-bright); }
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 15px;
+  text-align: center;
+  user-select: none;
+  width: 26px;
+}
+tr.key-row:active .drag-handle { cursor: grabbing; }
+
 .btn-action-icon {
   width: 30px;
   height: 30px;
@@ -2215,7 +2229,7 @@ body.theme-light .btn-action-icon.btn-action-commit:hover {
       <div style="border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-bottom:16px;">
         <table class="data-table" style="font-size:11.5px;">
           <thead>
-            <tr><th>PROVIDER</th><th>KEY SIGNATURE</th><th>STATUS</th><th>REMARK</th><th style="text-align:right;">ACTIONS</th></tr>
+            <tr><th style="width:26px;"></th><th>PROVIDER</th><th>KEY SIGNATURE</th><th>STATUS</th><th>REMARK</th><th style="text-align:right;">ACTIONS</th></tr>
           </thead>
           <tbody id="cfg-keys-tbody"></tbody>
         </table>
@@ -3533,17 +3547,21 @@ function renderProviderKeys(prov) {
 
   if (keys.length === 0) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="5" style="text-align:center; padding:16px; color:var(--text-sub); font-size:11.5px;">No keys registered for ${prov}. Add one below.</td>`;
+    tr.innerHTML = `<td colspan="6" style="text-align:center; padding:16px; color:var(--text-sub); font-size:11.5px;">No keys registered for ${prov}. Add one below.</td>`;
     tbody.appendChild(tr);
     return;
   }
 
   keys.forEach((k, idx) => {
     const tr = document.createElement('tr');
+    tr.className = 'key-row';
+    tr.dataset.idx = idx;
+    tr.draggable = true;
     tr.innerHTML = `
+      <td class="drag-handle" title="Drag to reorder — top key is used first">\u2807</td>
       <td><span class="badge badge-green" style="font-size:10px;">${provLabel(prov)}</span></td>
       <td class="mono" style="color:var(--text-muted);">${k.masked}</td>
-      <td><span style="color:var(--green-bright); font-weight:700; font-size:11px;">${k.status || 'ACTIVE'}</span></td>
+      <td><span style="color:var(--green-bright); font-weight:700; font-size:11px;">${idx === 0 ? 'PRIMARY' : 'FAILOVER'}</span></td>
       <td style="color:var(--text-muted);">${k.remark || '\u2014'}</td>
       <td style="text-align:right;">
         <button style="background:none; border:none; color:#f87171; cursor:pointer; font-size:13px;" onclick="removeKey('${prov}', ${idx})" title="Remove key">&#128465;</button>
@@ -3551,6 +3569,56 @@ function renderProviderKeys(prov) {
     `;
     tbody.appendChild(tr);
   });
+  wireKeyDragDrop(tbody, prov);
+}
+
+function wireKeyDragDrop(tbody, prov) {
+  let draggedRow = null;
+
+  tbody.querySelectorAll('tr.key-row').forEach(tr => {
+    tr.addEventListener('dragstart', e => {
+      draggedRow = tr;
+      tr.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tr.dataset.idx);
+    });
+    tr.addEventListener('dragend', async () => {
+      tr.classList.remove('dragging');
+      tbody.querySelectorAll('tr.key-row').forEach(r => r.classList.remove('drop-target'));
+      if (draggedRow) {
+        const order = [...tbody.querySelectorAll('tr.key-row')]
+          .map(r => Number(r.dataset.idx));
+        draggedRow = null;
+        await saveKeyOrder(prov, order);
+      }
+    });
+    tr.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!draggedRow || tr === draggedRow) return;
+      const rect = tr.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height / 2;
+      tr.classList.add('drop-target');
+      if (before) tbody.insertBefore(draggedRow, tr);
+      else if (tr.nextSibling) tbody.insertBefore(draggedRow, tr.nextSibling);
+      else tbody.appendChild(draggedRow);
+    });
+    tr.addEventListener('dragleave', () => tr.classList.remove('drop-target'));
+    tr.addEventListener('drop', e => e.preventDefault());
+  });
+}
+
+async function saveKeyOrder(prov, order) {
+  try {
+    const res = await apiPost('/api/config/keys/reorder', { provider: prov, order });
+    if (res.provider) DB.config.providers[prov] = res.provider;
+    else await loadConfig();
+    renderProviderKeys(prov);
+    showToast('Key priority updated for ' + provLabel(prov));
+  } catch (e) {
+    showToast('Reorder failed: ' + e.message);
+    renderProviderKeys(prov);
+  }
 }
 
 async function removeKey(prov, idx) {
